@@ -6,39 +6,50 @@ async function handler(req, res) {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
-  const { secret } = req.body;
+  const { secret, email, password, action } = req.body;
 
-  // One-time secret to create first admin
   if (secret !== 'hidayahmy-bootstrap-2026') {
     return res.status(403).json({ success: false, error: 'Invalid secret' });
   }
 
-  // Check if any admin already exists
-  const { data: listData } = await supabaseAdmin.auth.admin.listUsers();
-  const existingAdmin = listData?.users?.find(u => u.user_metadata?.role === 'admin');
+  // Action: set-role — set an existing user as admin
+  if (action === 'set-role') {
+    if (!email) return res.status(400).json({ success: false, error: 'Email required' });
 
-  if (existingAdmin) {
-    return res.status(400).json({ success: false, error: 'Admin already exists. Use the admin portal to add more.' });
+    const { data: listData } = await supabaseAdmin.auth.admin.listUsers();
+    const user = listData?.users?.find(u => u.email === email);
+
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
+      user_metadata: { ...user.user_metadata, role: 'admin' },
+    });
+
+    if (error) return res.status(400).json({ success: false, error: error.message });
+
+    return res.status(200).json({ success: true, message: `${email} is now admin` });
+  }
+
+  // Action: create — create a new admin user
+  if (!email || !password) {
+    return res.status(400).json({ success: false, error: 'Email and password required' });
   }
 
   const { data, error } = await supabaseAdmin.auth.admin.createUser({
-    email: 'admin@hidayahmy.com',
-    password: 'password',
+    email,
+    password,
     email_confirm: true,
     user_metadata: { name: 'Admin', role: 'admin' },
   });
 
-  if (error) {
-    return res.status(400).json({ success: false, error: error.message });
-  }
+  if (error) return res.status(400).json({ success: false, error: error.message });
 
   return res.status(201).json({
     success: true,
-    message: 'First admin created',
-    user: {
-      email: data.user.email,
-      role: 'admin',
-    },
+    message: 'Admin created',
+    user: { email: data.user.email, role: 'admin' },
   });
 }
 
