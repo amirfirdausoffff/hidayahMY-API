@@ -25,15 +25,11 @@ async function handler(req, res) {
   // DELETE - remove avatar
   if (req.method === 'DELETE') {
     // Remove file from storage
-    const oldUrl = user.user_metadata?.avatar_url;
-    if (oldUrl && oldUrl.includes('avatars/')) {
-      const path = `avatars/${user.id}`;
-      await supabaseAdmin.storage.from('avatars').remove([`${user.id}`]);
-    }
+    await supabaseAdmin.storage.from('avatars').remove([`${user.id}`]);
 
-    // Update user metadata
+    // Mark as removed so SSO photo won't come back
     await supabaseAdmin.auth.admin.updateUserById(user.id, {
-      user_metadata: { ...user.user_metadata, avatar_url: '' },
+      user_metadata: { ...user.user_metadata, custom_avatar: 'removed' },
     });
 
     return res.status(200).json({
@@ -73,15 +69,35 @@ async function handler(req, res) {
 
     const avatarUrl = `${urlData.publicUrl}?t=${Date.now()}`;
 
-    // Update user metadata
+    // Save to custom_avatar so it persists across SSO re-logins
     await supabaseAdmin.auth.admin.updateUserById(user.id, {
-      user_metadata: { ...user.user_metadata, avatar_url: avatarUrl },
+      user_metadata: { ...user.user_metadata, custom_avatar: avatarUrl },
     });
 
     return res.status(200).json({
       success: true,
       message: 'Avatar uploaded',
       avatar_url: avatarUrl,
+    });
+  }
+
+  // GET - resolve avatar (respects custom preference)
+  if (req.method === 'GET') {
+    const customAvatar = user.user_metadata?.custom_avatar;
+    let avatarUrl = '';
+
+    if (customAvatar === 'removed') {
+      avatarUrl = '';
+    } else if (customAvatar) {
+      avatarUrl = customAvatar;
+    } else {
+      avatarUrl = user.user_metadata?.avatar_url || '';
+    }
+
+    return res.status(200).json({
+      success: true,
+      avatar_url: avatarUrl,
+      has_custom: !!customAvatar,
     });
   }
 
