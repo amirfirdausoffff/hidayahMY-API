@@ -243,6 +243,51 @@ const apiGroups = [
       },
     ],
   },
+  {
+    name: 'FCM Tokens',
+    description: 'Device push notification token management (requires Bearer token)',
+    tag: 'fcm-token',
+    endpoints: [
+      {
+        method: 'POST', path: '/api/fcm-token',
+        summary: 'Register or update FCM token',
+        description: 'Saves the device FCM token for push notifications. Called on app start after login.',
+        auth: true,
+        body: { fcm_token: 'firebase_token_string', platform: 'android' },
+        response: { success: true, message: 'Token registered', token: { id: 'uuid', fcm_token: '...', platform: 'android' } },
+      },
+      {
+        method: 'DELETE', path: '/api/fcm-token',
+        summary: 'Remove FCM token',
+        description: 'Removes the device FCM token. Called on logout to stop receiving push notifications.',
+        auth: true,
+        body: { fcm_token: 'firebase_token_string' },
+        response: { success: true, message: 'Token removed' },
+      },
+    ],
+  },
+  {
+    name: 'Push Notifications (Admin)',
+    description: 'Send push notifications to app users (requires role: admin)',
+    tag: 'notifications',
+    endpoints: [
+      {
+        method: 'POST', path: '/api/admin/send-notification',
+        summary: 'Send push notification to all users',
+        description: 'Sends a push notification via FCM to all registered devices. Automatically cleans up invalid tokens.',
+        auth: true, admin: true,
+        body: { title: 'Announcement', body: 'New feature available!', data: {} },
+        response: { success: true, message: 'Notification sent', sent: 150, failed: 2, cleaned: 1 },
+      },
+      {
+        method: 'GET', path: '/api/admin/notifications',
+        summary: 'List sent notification history',
+        description: 'Returns the last 50 sent notifications with delivery stats.',
+        auth: true, admin: true,
+        response: { success: true, notifications: [{ id: 'uuid', title: '...', body: '...', total_sent: 150, total_failed: 2, created_at: '...' }] },
+      },
+    ],
+  },
 ];
 
 function EndpointCard({ ep }) {

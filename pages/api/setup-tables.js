@@ -37,15 +37,42 @@ CREATE TABLE IF NOT EXISTS prayer_checkins (
   UNIQUE(user_id, date, prayer)
 );
 
+-- FCM tokens table
+CREATE TABLE IF NOT EXISTS fcm_tokens (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  fcm_token text NOT NULL UNIQUE,
+  platform text DEFAULT 'unknown',
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- Notifications history table
+CREATE TABLE IF NOT EXISTS notifications (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  title text NOT NULL,
+  body text NOT NULL,
+  data jsonb DEFAULT '{}',
+  sent_by uuid REFERENCES auth.users(id),
+  total_sent int DEFAULT 0,
+  total_failed int DEFAULT 0,
+  created_at timestamptz DEFAULT now()
+);
+
 -- Enable Row Level Security
 ALTER TABLE bookmarks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE prayer_checkins ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fcm_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
 CREATE POLICY "Users can manage own bookmarks" ON bookmarks FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Users can manage own notes" ON notes FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Users can manage own prayer_checkins" ON prayer_checkins FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Users can manage own fcm_tokens" ON fcm_tokens FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Admins can read all notifications" ON notifications FOR SELECT USING (true);
+CREATE POLICY "Admins can insert notifications" ON notifications FOR INSERT WITH CHECK (true);
 `;
 
 async function handler(req, res) {
@@ -81,7 +108,21 @@ async function handler(req, res) {
     .limit(0);
   tables.prayer_checkins = !checkinError;
 
-  if (tables.bookmarks && tables.notes && tables.prayer_checkins) {
+  // Check if fcm_tokens table exists
+  const { error: fcmError } = await supabaseAdmin
+    .from('fcm_tokens')
+    .select('id')
+    .limit(0);
+  tables.fcm_tokens = !fcmError;
+
+  // Check if notifications table exists
+  const { error: notifError } = await supabaseAdmin
+    .from('notifications')
+    .select('id')
+    .limit(0);
+  tables.notifications = !notifError;
+
+  if (tables.bookmarks && tables.notes && tables.prayer_checkins && tables.fcm_tokens && tables.notifications) {
     return res.status(200).json({
       success: true,
       message: 'All tables already exist',
