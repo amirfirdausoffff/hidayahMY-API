@@ -67,8 +67,21 @@ ALTER TABLE notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE prayer_checkins ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fcm_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE backgrounds ENABLE ROW LEVEL SECURITY;
+
+-- Backgrounds table
+CREATE TABLE IF NOT EXISTS backgrounds (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  name text NOT NULL,
+  category text NOT NULL CHECK (category IN ('dashboard', 'prayer')),
+  image_url text NOT NULL,
+  storage_path text NOT NULL,
+  uploaded_by uuid REFERENCES auth.users(id),
+  created_at timestamptz DEFAULT now()
+);
 
 -- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_backgrounds_category ON backgrounds(category);
 CREATE INDEX IF NOT EXISTS idx_bookmarks_user_id ON bookmarks(user_id);
 CREATE INDEX IF NOT EXISTS idx_notes_user_id ON notes(user_id);
 CREATE INDEX IF NOT EXISTS idx_prayer_checkins_user_date ON prayer_checkins(user_id, date);
@@ -82,6 +95,8 @@ CREATE POLICY "Users can manage own prayer_checkins" ON prayer_checkins FOR ALL 
 CREATE POLICY "Users can manage own fcm_tokens" ON fcm_tokens FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Admins can read all notifications" ON notifications FOR SELECT USING (true);
 CREATE POLICY "Admins can insert notifications" ON notifications FOR INSERT WITH CHECK (true);
+CREATE POLICY "Anyone can read backgrounds" ON backgrounds FOR SELECT USING (true);
+CREATE POLICY "Admins can manage backgrounds" ON backgrounds FOR ALL USING (true);
 `;
 
 async function handler(req, res) {
