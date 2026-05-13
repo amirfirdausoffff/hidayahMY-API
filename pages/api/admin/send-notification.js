@@ -23,7 +23,7 @@ async function handler(req, res) {
     return res.status(403).json({ success: false, error: 'Admin access required' });
   }
 
-  const { title, body, topic } = req.body;
+  const { title, body, topic, user_id } = req.body;
 
   if (!title || !body) {
     return res.status(400).json({ success: false, error: 'title and body are required' });
@@ -31,32 +31,97 @@ async function handler(req, res) {
 
   const fcmTopic = topic || 'general';
 
-  // Send via FCM topic
-  const message = {
-    notification: { title, body },
-    data: { type: 'announcement', topic: fcmTopic },
-    topic: fcmTopic,
-    android: {
-      priority: 'high',
-      notification: {
-        channelId: 'announcements',
-        sound: 'default',
-      },
-    },
-    apns: {
-      payload: {
-        aps: {
-          sound: 'default',
-          badge: 1,
-        },
-      },
-    },
-  };
-
   try {
+    // Mode: send to specific user by user_id
+    if (user_id) {
+      const { data: tokens, error: tokenError } = await supabaseAdmin
+        .from('fcm_tokens')
+        .select('fcm_token')
+        .eq('user_id', user_id);
+
+      if (tokenError) {
+        return res.status(400).json({ success: false, error: tokenError.message });
+      }
+
+      if (!tokens || tokens.length === 0) {
+        return res.status(200).json({ success: false, error: 'No devices found for this user' });
+      }
+
+      const fcmTokens = tokens.map((t) => t.fcm_token);
+
+      const message = {
+        notification: { title, body },
+        data: { type: 'announcement', topic: fcmTopic },
+        tokens: fcmTokens,
+        android: {
+          priority: 'high',
+          notification: { channelId: 'announcements', sound: 'default' },
+        },
+        apns: {
+          payload: { aps: { sound: 'default', badge: 1 } },
+        },
+      };
+
+      const response = await messaging.sendEachForMulticast(message);
+
+      // Clean up invalid tokens
+      const invalidTokens = [];
+      response.responses.forEach((resp, idx) => {
+        if (!resp.success) {
+          const code = resp.error?.code;
+          if (
+            code === 'messaging/invalid-registration-token' ||
+            code === 'messaging/registration-token-not-registered'
+          ) {
+            invalidTokens.push(fcmTokens[idx]);
+          }
+        }
+      });
+
+      if (invalidTokens.length > 0) {
+        await supabaseAdmin
+          .from('fcm_tokens')
+          .delete()
+          .in('fcm_token', invalidTokens);
+      }
+
+      // Save to history
+      await supabaseAdmin
+        .from('notifications')
+        .insert({
+          title,
+          body,
+          topic: fcmTopic,
+          sent_by: user.id,
+          target_user_id: user_id,
+          data: { type: 'announcement', topic: fcmTopic, target: 'user' },
+        });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Notification sent to user',
+        sent: response.successCount,
+        failed: response.failureCount,
+        topic: fcmTopic,
+      });
+    }
+
+    // Mode: send to topic (all subscribers)
+    const message = {
+      notification: { title, body },
+      data: { type: 'announcement', topic: fcmTopic },
+      topic: fcmTopic,
+      android: {
+        priority: 'high',
+        notification: { channelId: 'announcements', sound: 'default' },
+      },
+      apns: {
+        payload: { aps: { sound: 'default', badge: 1 } },
+      },
+    };
+
     const response = await messaging.send(message);
 
-    // Save notification to history
     await supabaseAdmin
       .from('notifications')
       .insert({

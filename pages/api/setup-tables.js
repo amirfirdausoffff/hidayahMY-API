@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   topic text DEFAULT 'general',
   data jsonb DEFAULT '{}',
   sent_by uuid REFERENCES auth.users(id),
+  target_user_id uuid REFERENCES auth.users(id),
   total_sent int DEFAULT 0,
   total_failed int DEFAULT 0,
   created_at timestamptz DEFAULT now()
