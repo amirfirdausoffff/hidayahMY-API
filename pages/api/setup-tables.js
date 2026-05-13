@@ -68,6 +68,13 @@ ALTER TABLE prayer_checkins ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fcm_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_bookmarks_user_id ON bookmarks(user_id);
+CREATE INDEX IF NOT EXISTS idx_notes_user_id ON notes(user_id);
+CREATE INDEX IF NOT EXISTS idx_prayer_checkins_user_date ON prayer_checkins(user_id, date);
+CREATE INDEX IF NOT EXISTS idx_fcm_tokens_user_id ON fcm_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
+
 -- RLS Policies
 CREATE POLICY "Users can manage own bookmarks" ON bookmarks FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Users can manage own notes" ON notes FOR ALL USING (auth.uid() = user_id);
