@@ -273,18 +273,32 @@ const apiGroups = [
     endpoints: [
       {
         method: 'POST', path: '/api/admin/send-notification',
-        summary: 'Send push notification to all users',
-        description: 'Sends a push notification via FCM to all registered devices. Automatically cleans up invalid tokens.',
+        summary: 'Send push notification via topic',
+        description: 'Sends a push notification via FCM topic. Default topic: general. All app users subscribed to the topic will receive it.',
         auth: true, admin: true,
-        body: { title: 'Announcement', body: 'New feature available!', data: {} },
-        response: { success: true, message: 'Notification sent', sent: 150, failed: 2, cleaned: 1 },
+        body: { title: 'Announcement', body: 'New feature available!', topic: 'general' },
+        response: { success: true, message: 'Notification sent to topic: general', messageId: 'projects/hidayah-my/messages/...', topic: 'general' },
       },
       {
         method: 'GET', path: '/api/admin/notifications',
-        summary: 'List sent notification history',
+        summary: 'List sent notification history (admin)',
         description: 'Returns the last 50 sent notifications with delivery stats.',
         auth: true, admin: true,
-        response: { success: true, notifications: [{ id: 'uuid', title: '...', body: '...', total_sent: 150, total_failed: 2, created_at: '...' }] },
+        response: { success: true, notifications: [{ id: 'uuid', title: '...', body: '...', topic: 'general', created_at: '...' }] },
+      },
+    ],
+  },
+  {
+    name: 'Notifications',
+    description: 'Get notifications for app users (requires Bearer token)',
+    tag: 'user-notifications',
+    endpoints: [
+      {
+        method: 'GET', path: '/api/notifications',
+        summary: 'Get notification list',
+        description: 'Returns the last 50 notifications sent by admin. Used by the Flutter app notification screen.',
+        auth: true,
+        response: { success: true, notifications: [{ id: 'uuid', title: '...', body: '...', topic: 'general', created_at: '...' }] },
       },
     ],
   },

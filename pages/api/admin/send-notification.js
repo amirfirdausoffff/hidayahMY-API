@@ -19,37 +19,23 @@ async function handler(req, res) {
     return res.status(401).json({ success: false, error: 'Invalid or expired token' });
   }
 
-  // Admin check
   if (user.user_metadata?.role !== 'admin') {
     return res.status(403).json({ success: false, error: 'Admin access required' });
   }
 
-  const { title, body, data: notifData } = req.body;
+  const { title, body, topic } = req.body;
 
   if (!title || !body) {
     return res.status(400).json({ success: false, error: 'title and body are required' });
   }
 
-  // Get all FCM tokens
-  const { data: tokens, error: tokenError } = await supabaseAdmin
-    .from('fcm_tokens')
-    .select('fcm_token');
+  const fcmTopic = topic || 'general';
 
-  if (tokenError) {
-    return res.status(400).json({ success: false, error: tokenError.message });
-  }
-
-  if (!tokens || tokens.length === 0) {
-    return res.status(200).json({ success: true, message: 'No devices to send to', sent: 0, failed: 0 });
-  }
-
-  const fcmTokens = tokens.map((t) => t.fcm_token);
-
-  // Send via FCM using sendEachForMulticast
+  // Send via FCM topic
   const message = {
     notification: { title, body },
-    data: notifData || {},
-    tokens: fcmTokens,
+    data: { type: 'announcement', topic: fcmTopic },
+    topic: fcmTopic,
     android: {
       priority: 'high',
       notification: {
@@ -68,29 +54,7 @@ async function handler(req, res) {
   };
 
   try {
-    const response = await messaging.sendEachForMulticast(message);
-
-    // Clean up invalid tokens
-    const invalidTokens = [];
-    response.responses.forEach((resp, idx) => {
-      if (!resp.success) {
-        const code = resp.error?.code;
-        if (
-          code === 'messaging/invalid-registration-token' ||
-          code === 'messaging/registration-token-not-registered'
-        ) {
-          invalidTokens.push(fcmTokens[idx]);
-        }
-      }
-    });
-
-    // Remove invalid tokens from database
-    if (invalidTokens.length > 0) {
-      await supabaseAdmin
-        .from('fcm_tokens')
-        .delete()
-        .in('fcm_token', invalidTokens);
-    }
+    const response = await messaging.send(message);
 
     // Save notification to history
     await supabaseAdmin
@@ -98,18 +62,16 @@ async function handler(req, res) {
       .insert({
         title,
         body,
-        data: notifData || {},
+        topic: fcmTopic,
         sent_by: user.id,
-        total_sent: response.successCount,
-        total_failed: response.failureCount,
+        data: { type: 'announcement', topic: fcmTopic },
       });
 
     return res.status(200).json({
       success: true,
-      message: 'Notification sent',
-      sent: response.successCount,
-      failed: response.failureCount,
-      cleaned: invalidTokens.length,
+      message: `Notification sent to topic: ${fcmTopic}`,
+      messageId: response,
+      topic: fcmTopic,
     });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });

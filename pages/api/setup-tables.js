@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   title text NOT NULL,
   body text NOT NULL,
+  topic text DEFAULT 'general',
   data jsonb DEFAULT '{}',
   sent_by uuid REFERENCES auth.users(id),
   total_sent int DEFAULT 0,
