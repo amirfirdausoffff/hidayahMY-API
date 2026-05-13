@@ -214,6 +214,35 @@ const apiGroups = [
       },
     ],
   },
+  {
+    name: 'Prayer Check-in',
+    description: 'Track daily prayer completion (requires Bearer token)',
+    tag: 'prayer-checkin',
+    endpoints: [
+      {
+        method: 'POST', path: '/api/prayer-checkin',
+        summary: 'Check-in or uncheck a prayer',
+        description: 'Upsert a prayer check-in for a specific date. Prayer keys: subuh, zohor, asar, maghrib, isyak. Status: 1 = checked, 0 = unchecked.',
+        auth: true,
+        body: { date: '2026-05-13', prayer: 'subuh', status: 1 },
+        response: { success: true, checkin: { id: 'uuid', user_id: 'uuid', date: '2026-05-13', prayer: 'subuh', status: 1, updated_at: '...' } },
+      },
+      {
+        method: 'GET', path: '/api/prayer-checkin?date=2026-05-13',
+        summary: 'Get check-ins for a single date',
+        description: 'Returns prayer check-in status for the specified date. Only returns prayers that have been checked in.',
+        auth: true,
+        response: { success: true, date: '2026-05-13', prayers: { subuh: 1, zohor: 1, asar: 0, maghrib: 1, isyak: 0 } },
+      },
+      {
+        method: 'GET', path: '/api/prayer-checkin?date_from=2026-05-01&date_to=2026-05-13',
+        summary: 'Get check-ins for a date range',
+        description: 'Returns prayer check-in statuses grouped by date for the specified range. Useful for calendar view and streak calculation.',
+        auth: true,
+        response: { success: true, date_from: '2026-05-01', date_to: '2026-05-13', checkins: { '2026-05-12': { subuh: 1, zohor: 1, asar: 1, maghrib: 1, isyak: 1 }, '2026-05-13': { subuh: 1, zohor: 0 } } },
+      },
+    ],
+  },
 ];
 
 function EndpointCard({ ep }) {
