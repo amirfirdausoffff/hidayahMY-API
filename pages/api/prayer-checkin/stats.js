@@ -3,6 +3,10 @@ import { cors } from '../../../src/lib/cors';
 
 const VALID_PRAYERS = ['subuh', 'zohor', 'asar', 'maghrib', 'isyak'];
 
+function formatDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
@@ -20,7 +24,6 @@ async function handler(req, res) {
     return res.status(401).json({ success: false, error: 'Invalid or expired token' });
   }
 
-  // Query params: month (YYYY-MM) — defaults to current month
   const { month } = req.query;
   const now = new Date();
   let year, monthNum;
@@ -32,128 +35,131 @@ async function handler(req, res) {
     monthNum = now.getMonth() + 1;
   }
 
-  // Date range for the requested month
-  const monthStart = `${year}-${String(monthNum).padStart(2, '0')}-01`;
   const lastDay = new Date(year, monthNum, 0).getDate();
+  const monthStart = `${year}-${String(monthNum).padStart(2, '0')}-01`;
   const monthEnd = `${year}-${String(monthNum).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
-  // Fetch all check-ins for the month
-  const { data: monthData, error: monthError } = await supabaseAdmin
+  // Streak: go back max 90 days for current streak (nobody has 365-day streak realistically)
+  // and use the same query for longest streak within that window
+  const streakFrom = new Date(now);
+  streakFrom.setDate(streakFrom.getDate() - 90);
+  const streakFromStr = formatDate(streakFrom);
+  const todayStr = formatDate(now);
+
+  // ── Single query: fetch all checked prayers from streak window ──
+  // This covers both the month data AND the streak data in one query
+  // since the month is always within the 90-day streak window (or we fetch both ranges)
+  const fetchFrom = monthStart < streakFromStr ? monthStart : streakFromStr;
+  const fetchTo = monthEnd > todayStr ? todayStr : monthEnd > todayStr ? todayStr : (monthEnd > todayStr ? todayStr : monthEnd);
+  const actualTo = todayStr > monthEnd ? todayStr : monthEnd;
+
+  const { data: allData, error: queryError } = await supabaseAdmin
     .from('prayer_checkins')
-    .select('date, prayer, status')
+    .select('date, prayer')
     .eq('user_id', user.id)
-    .gte('date', monthStart)
-    .lte('date', monthEnd)
+    .gte('date', fetchFrom)
+    .lte('date', actualTo)
     .eq('status', 1)
     .order('date', { ascending: true });
 
-  if (monthError) {
-    return res.status(400).json({ success: false, error: monthError.message });
+  if (queryError) {
+    return res.status(400).json({ success: false, error: queryError.message });
   }
 
-  // Group by date
-  const byDate = {};
-  for (const row of monthData) {
+  // ── Process all data in a single pass ──
+  const byDate = {};       // all dates → Set of prayers
+  const monthByDate = {};   // month dates only → Set of prayers
+  const prayerBreakdown = {};
+  for (const p of VALID_PRAYERS) prayerBreakdown[p] = 0;
+
+  for (const row of allData) {
+    // All dates (for streak)
     if (!byDate[row.date]) byDate[row.date] = new Set();
     byDate[row.date].add(row.prayer);
+
+    // Month dates only (for stats)
+    if (row.date >= monthStart && row.date <= monthEnd) {
+      if (!monthByDate[row.date]) monthByDate[row.date] = new Set();
+      monthByDate[row.date].add(row.prayer);
+      prayerBreakdown[row.prayer]++;
+    }
   }
 
-  // Monthly stats
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const daysInMonth = lastDay;
-  // Only count days up to today if current month
+  // ── Monthly stats ──
   const isCurrentMonth = year === now.getFullYear() && monthNum === now.getMonth() + 1;
-  const countableDays = isCurrentMonth ? now.getDate() : daysInMonth;
-
+  const countableDays = isCurrentMonth ? now.getDate() : lastDay;
   let totalPrayers = 0;
   let perfectDays = 0;
 
-  for (const [date, prayers] of Object.entries(byDate)) {
+  for (const prayers of Object.values(monthByDate)) {
     totalPrayers += prayers.size;
     if (prayers.size === 5) perfectDays++;
   }
 
-  // Per-prayer breakdown for the month
-  const prayerBreakdown = {};
-  for (const p of VALID_PRAYERS) {
-    prayerBreakdown[p] = 0;
-  }
-  for (const row of monthData) {
-    prayerBreakdown[row.prayer]++;
-  }
+  // ── Streak calculation — only iterate dates that have data ──
+  // Build sorted unique dates from byDate keys
+  const sortedDates = Object.keys(byDate).sort();
 
-  // Current streak & longest streak — fetch last 365 days of data
-  const streakFrom = new Date(now);
-  streakFrom.setDate(streakFrom.getDate() - 365);
-  const streakFromStr = `${streakFrom.getFullYear()}-${String(streakFrom.getMonth() + 1).padStart(2, '0')}-${String(streakFrom.getDate()).padStart(2, '0')}`;
-
-  const { data: streakData, error: streakError } = await supabaseAdmin
-    .from('prayer_checkins')
-    .select('date, prayer')
-    .eq('user_id', user.id)
-    .gte('date', streakFromStr)
-    .lte('date', todayStr)
-    .eq('status', 1)
-    .order('date', { ascending: true });
-
-  if (streakError) {
-    return res.status(400).json({ success: false, error: streakError.message });
-  }
-
-  // Group streak data by date
-  const streakByDate = {};
-  for (const row of streakData) {
-    if (!streakByDate[row.date]) streakByDate[row.date] = new Set();
-    streakByDate[row.date].add(row.prayer);
-  }
-
-  // Calculate current streak (consecutive days with 5/5, going backwards from today/yesterday)
-  let currentStreak = 0;
+  // Longest streak
   let longestStreak = 0;
   let tempStreak = 0;
+  let prevDate = null;
 
-  // Build array of dates from streakFrom to today
-  const allDates = [];
-  const d = new Date(streakFrom);
-  while (d <= now) {
-    const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    allDates.push(ds);
-    d.setDate(d.getDate() + 1);
-  }
-
-  // Calculate longest streak
-  for (const ds of allDates) {
-    const prayers = streakByDate[ds];
-    if (prayers && prayers.size === 5) {
-      tempStreak++;
+  for (const ds of sortedDates) {
+    if (byDate[ds].size === 5) {
+      if (prevDate) {
+        // Check if consecutive
+        const prev = new Date(prevDate + 'T00:00:00');
+        const curr = new Date(ds + 'T00:00:00');
+        const diffDays = (curr - prev) / 86400000;
+        if (diffDays === 1) {
+          tempStreak++;
+        } else {
+          tempStreak = 1;
+        }
+      } else {
+        tempStreak = 1;
+      }
       if (tempStreak > longestStreak) longestStreak = tempStreak;
+      prevDate = ds;
     } else {
       tempStreak = 0;
+      prevDate = null;
     }
   }
 
-  // Calculate current streak (backwards from today)
-  // If today is not complete, start from yesterday
-  const todayPrayers = streakByDate[todayStr];
+  // Current streak (backwards from today)
+  const todayPrayers = byDate[todayStr];
   const todayComplete = todayPrayers && todayPrayers.size === 5;
+  let currentStreak = 0;
 
-  currentStreak = 0;
-  for (let i = allDates.length - 1; i >= 0; i--) {
-    const ds = allDates[i];
-    // Skip today if not complete
-    if (ds === todayStr && !todayComplete) continue;
-    const prayers = streakByDate[ds];
+  // Start from today (if complete) or yesterday
+  const checkDate = new Date(now);
+  if (!todayComplete) {
+    checkDate.setDate(checkDate.getDate() - 1);
+  }
+
+  for (let i = 0; i < 90; i++) {
+    const ds = formatDate(checkDate);
+    const prayers = byDate[ds];
     if (prayers && prayers.size === 5) {
       currentStreak++;
+      checkDate.setDate(checkDate.getDate() - 1);
     } else {
       break;
     }
   }
 
+  // ── Daily summary ──
+  const dailySummary = {};
+  for (const [date, prayers] of Object.entries(monthByDate)) {
+    dailySummary[date] = prayers.size;
+  }
+
   return res.status(200).json({
     success: true,
     month: `${year}-${String(monthNum).padStart(2, '0')}`,
-    days_in_month: daysInMonth,
+    days_in_month: lastDay,
     countable_days: countableDays,
     current_streak: currentStreak,
     longest_streak: longestStreak,
@@ -161,10 +167,7 @@ async function handler(req, res) {
     total_prayers: totalPrayers,
     max_prayers: countableDays * 5,
     prayer_breakdown: prayerBreakdown,
-    // Daily summary: { "2026-05-01": 5, "2026-05-02": 3, ... }
-    daily_summary: Object.fromEntries(
-      Object.entries(byDate).map(([date, prayers]) => [date, prayers.size])
-    ),
+    daily_summary: dailySummary,
   });
 }
 

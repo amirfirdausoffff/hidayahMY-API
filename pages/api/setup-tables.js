@@ -85,6 +85,7 @@ CREATE INDEX IF NOT EXISTS idx_backgrounds_category ON backgrounds(category);
 CREATE INDEX IF NOT EXISTS idx_bookmarks_user_id ON bookmarks(user_id);
 CREATE INDEX IF NOT EXISTS idx_notes_user_id ON notes(user_id);
 CREATE INDEX IF NOT EXISTS idx_prayer_checkins_user_date ON prayer_checkins(user_id, date);
+CREATE INDEX IF NOT EXISTS idx_prayer_checkins_user_date_status ON prayer_checkins(user_id, date, status) WHERE status = 1;
 CREATE INDEX IF NOT EXISTS idx_fcm_tokens_user_id ON fcm_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
 

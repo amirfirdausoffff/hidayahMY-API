@@ -8,6 +8,7 @@ async function handler(req, res) {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
+  // Fast JWT decode — avoid network call to Supabase Auth for every request
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ success: false, error: 'Missing authorization' });
@@ -28,7 +29,7 @@ async function handler(req, res) {
     if (date) {
       const { data, error } = await supabaseAdmin
         .from('prayer_checkins')
-        .select('prayer, status, updated_at')
+        .select('prayer, status')
         .eq('user_id', user.id)
         .eq('date', date);
 
@@ -36,7 +37,6 @@ async function handler(req, res) {
         return res.status(400).json({ success: false, error: error.message });
       }
 
-      // Build prayer map: { subuh: 1, zohor: 0, ... }
       const prayers = {};
       for (const row of data) {
         prayers[row.prayer] = row.status;
@@ -49,7 +49,7 @@ async function handler(req, res) {
     if (date_from && date_to) {
       const { data, error } = await supabaseAdmin
         .from('prayer_checkins')
-        .select('date, prayer, status, updated_at')
+        .select('date, prayer, status')
         .eq('user_id', user.id)
         .gte('date', date_from)
         .lte('date', date_to)
@@ -59,7 +59,6 @@ async function handler(req, res) {
         return res.status(400).json({ success: false, error: error.message });
       }
 
-      // Group by date: { "2026-05-13": { subuh: 1, zohor: 0 }, ... }
       const grouped = {};
       for (const row of data) {
         if (!grouped[row.date]) grouped[row.date] = {};
@@ -100,7 +99,7 @@ async function handler(req, res) {
         },
         { onConflict: 'user_id,date,prayer' }
       )
-      .select()
+      .select('id, date, prayer, status')
       .single();
 
     if (error) {
