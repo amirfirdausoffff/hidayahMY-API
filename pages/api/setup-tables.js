@@ -80,8 +80,22 @@ CREATE TABLE IF NOT EXISTS backgrounds (
   created_at timestamptz DEFAULT now()
 );
 
+-- Azan sounds table
+CREATE TABLE IF NOT EXISTS azan_sounds (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  name text NOT NULL,
+  file_url text NOT NULL,
+  storage_path text NOT NULL,
+  duration_seconds integer,
+  uploaded_by uuid REFERENCES auth.users(id),
+  created_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE azan_sounds ENABLE ROW LEVEL SECURITY;
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_backgrounds_category ON backgrounds(category);
+CREATE INDEX IF NOT EXISTS idx_azan_sounds_created_at ON azan_sounds(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_bookmarks_user_id ON bookmarks(user_id);
 CREATE INDEX IF NOT EXISTS idx_notes_user_id ON notes(user_id);
 CREATE INDEX IF NOT EXISTS idx_prayer_checkins_user_date ON prayer_checkins(user_id, date);
@@ -98,6 +112,8 @@ CREATE POLICY "Admins can read all notifications" ON notifications FOR SELECT US
 CREATE POLICY "Admins can insert notifications" ON notifications FOR INSERT WITH CHECK (true);
 CREATE POLICY "Anyone can read backgrounds" ON backgrounds FOR SELECT USING (true);
 CREATE POLICY "Admins can manage backgrounds" ON backgrounds FOR ALL USING (true);
+CREATE POLICY "Anyone can read azan_sounds" ON azan_sounds FOR SELECT USING (true);
+CREATE POLICY "Admins can manage azan_sounds" ON azan_sounds FOR ALL USING (true);
 `;
 
 async function handler(req, res) {
@@ -148,7 +164,14 @@ async function handler(req, res) {
     .limit(0);
   tables.notifications = !notifError;
 
-  if (tables.bookmarks && tables.notes && tables.prayer_checkins && tables.fcm_tokens && tables.notifications) {
+  // Check if azan_sounds table exists
+  const { error: azanError } = await supabaseAdmin
+    .from('azan_sounds')
+    .select('id')
+    .limit(0);
+  tables.azan_sounds = !azanError;
+
+  if (tables.bookmarks && tables.notes && tables.prayer_checkins && tables.fcm_tokens && tables.notifications && tables.azan_sounds) {
     return res.status(200).json({
       success: true,
       message: 'All tables already exist',
