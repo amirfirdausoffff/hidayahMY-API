@@ -106,7 +106,8 @@ async function handler(req, res) {
   }
 
   const { secret } = req.body;
-  if (secret !== 'hidayahmy-setup-2026') {
+  const expectedSecret = process.env.ADMIN_BOOTSTRAP_SECRET;
+  if (!expectedSecret || secret !== expectedSecret) {
     return res.status(403).json({ success: false, error: 'Invalid setup secret' });
   }
 

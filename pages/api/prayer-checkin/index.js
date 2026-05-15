@@ -1,5 +1,6 @@
 import { supabase, supabaseAdmin } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
+import { isValidDate } from '../../../src/lib/validate';
 
 const VALID_PRAYERS = ['subuh', 'zohor', 'asar', 'maghrib', 'isyak'];
 
@@ -75,7 +76,7 @@ async function handler(req, res) {
   if (req.method === 'POST') {
     const { date, prayer, status } = req.body;
 
-    if (!date) {
+    if (!date || !isValidDate(date)) {
       return res.status(400).json({ success: false, error: 'date is required (YYYY-MM-DD)' });
     }
 

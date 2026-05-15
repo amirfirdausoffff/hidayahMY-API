@@ -1,6 +1,7 @@
 import { supabase, supabaseAdmin } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
 import { messaging } from '../../../src/lib/firebase-admin';
+import { sanitizeString } from '../../../src/lib/validate';
 
 async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -23,13 +24,17 @@ async function handler(req, res) {
     return res.status(403).json({ success: false, error: 'Admin access required' });
   }
 
-  const { title, body, topic, user_id } = req.body;
+  const rawTitle = req.body.title;
+  const rawBody = req.body.body;
+  const { topic, user_id } = req.body;
 
-  if (!title || !body) {
+  if (!rawTitle || !rawBody) {
     return res.status(400).json({ success: false, error: 'title and body are required' });
   }
 
-  const fcmTopic = topic || 'general';
+  const title = sanitizeString(rawTitle, 200);
+  const body = sanitizeString(rawBody, 1000);
+  const fcmTopic = sanitizeString(topic, 50) || 'general';
 
   try {
     // Mode: send to specific user by user_id
@@ -139,7 +144,8 @@ async function handler(req, res) {
       topic: fcmTopic,
     });
   } catch (error) {
-    return res.status(500).json({ success: false, error: error.message });
+    console.error('[send-notification] Error:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to send notification' });
   }
 }
 

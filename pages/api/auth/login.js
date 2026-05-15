@@ -1,18 +1,23 @@
 import { supabase } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
+import { checkRateLimit, getClientIp } from '../../../src/lib/rate-limit';
 
 async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
+  // Rate limit: 10 login attempts per 15 minutes per IP
+  const ip = getClientIp(req);
+  const { allowed } = checkRateLimit(`login:${ip}`, 10, 15 * 60 * 1000);
+  if (!allowed) {
+    return res.status(429).json({ success: false, error: 'Too many login attempts. Try again later.' });
+  }
+
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({
-      success: false,
-      error: 'Email and password are required',
-    });
+    return res.status(400).json({ success: false, error: 'Email and password are required' });
   }
 
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -21,7 +26,8 @@ async function handler(req, res) {
   });
 
   if (error) {
-    return res.status(401).json({ success: false, error: error.message });
+    // Don't reveal whether email exists — generic message
+    return res.status(401).json({ success: false, error: 'Invalid email or password' });
   }
 
   return res.status(200).json({

@@ -29,10 +29,10 @@ async function handler(req, res) {
 
   const { new_password } = req.body;
 
-  if (!new_password || new_password.length < 6) {
+  if (!new_password || new_password.length < 8) {
     return res.status(400).json({
       success: false,
-      error: 'Password must be at least 6 characters',
+      error: 'Password must be at least 8 characters',
     });
   }
 
@@ -41,7 +41,8 @@ async function handler(req, res) {
   });
 
   if (error) {
-    return res.status(400).json({ success: false, error: error.message });
+    console.error('[password] Update error:', error.message);
+    return res.status(400).json({ success: false, error: 'Failed to update password' });
   }
 
   return res.status(200).json({
