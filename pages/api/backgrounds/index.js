@@ -40,8 +40,8 @@ async function handler(req, res) {
       return res.status(400).json({ success: false, error: 'name, category, image_url, and storage_path are required' });
     }
 
-    if (!['dashboard', 'prayer'].includes(category)) {
-      return res.status(400).json({ success: false, error: 'category must be "dashboard" or "prayer"' });
+    if (!['dashboard', 'prayer', 'both'].includes(category)) {
+      return res.status(400).json({ success: false, error: 'category must be "dashboard", "prayer", or "both"' });
     }
 
     const { data: bg, error: dbError } = await supabaseAdmin

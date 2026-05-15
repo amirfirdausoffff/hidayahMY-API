@@ -73,7 +73,7 @@ ALTER TABLE backgrounds ENABLE ROW LEVEL SECURITY;
 CREATE TABLE IF NOT EXISTS backgrounds (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   name text NOT NULL,
-  category text NOT NULL CHECK (category IN ('dashboard', 'prayer')),
+  category text NOT NULL CHECK (category IN ('dashboard', 'prayer', 'both')),
   image_url text NOT NULL,
   storage_path text NOT NULL,
   uploaded_by uuid REFERENCES auth.users(id),
