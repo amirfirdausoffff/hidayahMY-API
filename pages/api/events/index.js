@@ -121,9 +121,39 @@ async function handler(req, res) {
     const total = results.length;
     const paginatedResults = results.slice(offset, offset + limitNum);
 
+    // Fetch response counts for all events in this page
+    const eventIds = paginatedResults.map(e => e.id);
+    let responseCounts = {};
+    if (eventIds.length > 0) {
+      const { data: allResponses } = await supabaseAdmin
+        .from('event_responses')
+        .select('event_id, response')
+        .in('event_id', eventIds);
+
+      if (allResponses) {
+        for (const r of allResponses) {
+          if (!responseCounts[r.event_id]) {
+            responseCounts[r.event_id] = { interested: 0, going: 0, attended: 0, reported: 0 };
+          }
+          if (responseCounts[r.event_id][r.response] !== undefined) {
+            responseCounts[r.event_id][r.response]++;
+          }
+        }
+      }
+    }
+
+    // Merge counts into events
+    const eventsWithCounts = paginatedResults.map(evt => ({
+      ...evt,
+      interested_count: responseCounts[evt.id]?.interested || 0,
+      going_count: responseCounts[evt.id]?.going || 0,
+      attended_count: responseCounts[evt.id]?.attended || 0,
+      report_count: responseCounts[evt.id]?.reported || evt.report_count || 0,
+    }));
+
     return res.status(200).json({
       success: true,
-      events: paginatedResults,
+      events: eventsWithCounts,
       total,
       page: pageNum,
       limit: limitNum,

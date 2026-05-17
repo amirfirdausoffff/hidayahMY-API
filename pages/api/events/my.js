@@ -52,7 +52,9 @@ async function handler(req, res) {
 
   const eventsWithCounts = (events || []).map(event => ({
     ...event,
-    response_counts: responseCounts[event.id] || { interested: 0, going: 0, attended: 0, reported: 0 },
+    interested_count: responseCounts[event.id]?.interested || 0,
+    going_count: responseCounts[event.id]?.going || 0,
+    attended_count: responseCounts[event.id]?.attended || 0,
   }));
 
   return res.status(200).json({ success: true, events: eventsWithCounts });
