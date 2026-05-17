@@ -379,6 +379,113 @@ const apiGroups = [
       },
     ],
   },
+  {
+    name: 'Events',
+    description: 'Community events - ceramah, kelas, and Islamic gatherings',
+    tag: 'events',
+    endpoints: [
+      {
+        method: 'GET', path: '/api/events?lat=3.1&lng=101.6&radius=10',
+        summary: 'List nearby events',
+        description: 'Returns approved events sorted by distance. Filter by category, radius, date. Query params: lat, lng, radius (km), category (category_id), status, page, limit.',
+        response: { success: true, events: [{ id: 'uuid', title: 'Ceramah Maghrib', location_name: 'Masjid Al-Hidayah', distance_km: 1.2, status: 'approved', start_date: '2026-05-23T20:00:00Z' }], total: 1, page: 1, limit: 20 },
+      },
+      {
+        method: 'POST', path: '/api/events',
+        summary: 'Create an event',
+        description: 'Create a new community event. Duplicate detection is applied. Events from trusted users (score >= 21) are auto-approved. Max 3 events per day.',
+        auth: true,
+        body: { title: 'Ceramah Maghrib', description: 'Weekly ceramah after Maghrib prayer', event_type: 'ceramah', location_name: 'Masjid Al-Hidayah', latitude: 3.1, longitude: 101.6, start_date: '2026-05-23T20:00:00Z', audience: 'all', tags: ['free', 'parking'] },
+        response: { success: true, event: { id: 'uuid', title: 'Ceramah Maghrib', status: 'pending' } },
+      },
+      {
+        method: 'GET', path: '/api/events/:id',
+        summary: 'Get event details',
+        description: 'Returns a single event with response counts (interested, going, attended, reported).',
+        response: { success: true, event: { id: 'uuid', title: '...', response_counts: { interested: 5, going: 12, attended: 8, reported: 0 } } },
+      },
+      {
+        method: 'PUT', path: '/api/events/:id',
+        summary: 'Update event',
+        description: 'Update an event. Owner can update event details, admin can also change status and rejection_reason.',
+        auth: true,
+        body: { title: 'Updated Title', description: 'Updated description' },
+        response: { success: true, event: { id: 'uuid', title: 'Updated Title', updated_at: '...' } },
+      },
+      {
+        method: 'DELETE', path: '/api/events/:id',
+        summary: 'Delete event',
+        description: 'Delete an event. Only the event owner or admin can delete.',
+        auth: true,
+        response: { success: true, message: 'Event deleted' },
+      },
+      {
+        method: 'POST', path: '/api/events/:id/respond',
+        summary: 'Respond to event (interested/going/report)',
+        description: 'Record a response to an event. If reported and report_count >= 3, event status changes to reported.',
+        auth: true,
+        body: { response: 'going' },
+        response: { success: true, message: 'Response recorded', response: 'going', response_counts: { interested: 5, going: 13, attended: 8, reported: 0 } },
+      },
+      {
+        method: 'GET', path: '/api/events/my',
+        summary: 'My created events',
+        description: 'Returns all events created by the authenticated user with response counts.',
+        auth: true,
+        response: { success: true, events: [{ id: 'uuid', title: '...', status: 'approved', response_counts: { interested: 5, going: 12, attended: 8, reported: 0 } }] },
+      },
+    ],
+  },
+  {
+    name: 'Event Categories',
+    description: 'Categories for community events (public list, admin management)',
+    tag: 'event-categories',
+    endpoints: [
+      {
+        method: 'GET', path: '/api/event-categories',
+        summary: 'List event categories',
+        description: 'Returns all active event categories sorted by sort_order.',
+        response: { success: true, categories: [{ id: 'uuid', name: 'Ceramah & Kuliah', name_ms: 'Ceramah & Kuliah', icon: 'mic', sort_order: 1 }] },
+      },
+      {
+        method: 'POST', path: '/api/event-categories',
+        summary: 'Add category',
+        description: 'Create a new event category. Admin only.',
+        auth: true, admin: true,
+        body: { name: 'New Category', name_ms: 'Kategori Baru', icon: 'star', sort_order: 10 },
+        response: { success: true, category: { id: 'uuid', name: 'New Category', name_ms: 'Kategori Baru', icon: 'star', sort_order: 10 } },
+      },
+      {
+        method: 'PUT', path: '/api/event-categories/:id',
+        summary: 'Update category',
+        description: 'Update an event category. Admin only.',
+        auth: true, admin: true,
+        body: { name: 'Updated Name', icon: 'heart' },
+        response: { success: true, category: { id: 'uuid', name: 'Updated Name' } },
+      },
+      {
+        method: 'DELETE', path: '/api/event-categories/:id',
+        summary: 'Delete category',
+        description: 'Delete an event category. Admin only.',
+        auth: true, admin: true,
+        response: { success: true, message: 'Category deleted' },
+      },
+    ],
+  },
+  {
+    name: 'User Trust',
+    description: 'User trust score for event auto-approval (requires Bearer token)',
+    tag: 'user-trust',
+    endpoints: [
+      {
+        method: 'GET', path: '/api/user-trust',
+        summary: 'Get my trust score',
+        description: 'Returns the authenticated user\'s trust score, level (new/trusted/verified/banned), and remaining daily event quota.',
+        auth: true,
+        response: { success: true, score: 10, level: 'new', daily_events_remaining: 3 },
+      },
+    ],
+  },
 ];
 
 function EndpointCard({ ep }) {

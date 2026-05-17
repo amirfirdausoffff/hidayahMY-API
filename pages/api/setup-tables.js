@@ -122,6 +122,88 @@ CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON feedback(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_feedback_user_id ON feedback(user_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status);
 
+-- Event categories
+CREATE TABLE IF NOT EXISTS event_categories (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL,
+  name_ms TEXT NOT NULL,
+  icon TEXT DEFAULT 'calendar',
+  sort_order INT DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Events
+CREATE TABLE IF NOT EXISTS events (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  event_type TEXT NOT NULL,
+  category_id UUID REFERENCES event_categories(id),
+  location_name TEXT NOT NULL,
+  latitude DOUBLE PRECISION NOT NULL,
+  longitude DOUBLE PRECISION NOT NULL,
+  start_date TIMESTAMPTZ NOT NULL,
+  end_date TIMESTAMPTZ,
+  is_recurring BOOLEAN DEFAULT false,
+  recurrence_rule TEXT,
+  audience TEXT DEFAULT 'all',
+  tags TEXT[] DEFAULT '{}',
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'reported', 'expired')),
+  rejection_reason TEXT,
+  verified_count INT DEFAULT 0,
+  report_count INT DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Event responses
+CREATE TABLE IF NOT EXISTS event_responses (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL,
+  event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  response TEXT NOT NULL CHECK (response IN ('interested', 'going', 'attended', 'reported')),
+  report_reason TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, event_id)
+);
+
+-- User trust scores
+CREATE TABLE IF NOT EXISTS user_trust_scores (
+  user_id UUID PRIMARY KEY,
+  score INT DEFAULT 10,
+  level TEXT DEFAULT 'new',
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE event_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE event_responses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_trust_scores ENABLE ROW LEVEL SECURITY;
+
+-- Indexes for events
+CREATE INDEX IF NOT EXISTS idx_events_user_id ON events(user_id);
+CREATE INDEX IF NOT EXISTS idx_events_status ON events(status);
+CREATE INDEX IF NOT EXISTS idx_events_start_date ON events(start_date);
+CREATE INDEX IF NOT EXISTS idx_events_category_id ON events(category_id);
+CREATE INDEX IF NOT EXISTS idx_events_lat_lng ON events(latitude, longitude);
+CREATE INDEX IF NOT EXISTS idx_event_responses_event_id ON event_responses(event_id);
+CREATE INDEX IF NOT EXISTS idx_event_responses_user_id ON event_responses(user_id);
+
+-- Seed default categories
+INSERT INTO event_categories (name, name_ms, icon, sort_order) VALUES
+  ('Ceramah & Kuliah', 'Ceramah & Kuliah', 'mic', 1),
+  ('Kelas & Pengajian', 'Kelas & Pengajian', 'book-open', 2),
+  ('Solat & Ibadah', 'Solat & Ibadah', 'moon', 3),
+  ('Ramadan', 'Ramadan', 'star', 4),
+  ('Charity & Derma', 'Amal & Derma', 'heart', 5),
+  ('Community', 'Komuniti', 'users', 6),
+  ('Youth & Kids', 'Belia & Kanak-kanak', 'baby', 7),
+  ('Sisters Only', 'Wanita Sahaja', 'shield', 8),
+  ('Hajj & Umrah', 'Haji & Umrah', 'compass', 9)
+ON CONFLICT DO NOTHING;
+
 -- RLS Policies
 CREATE POLICY "Users can manage own bookmarks" ON bookmarks FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Users can manage own notes" ON notes FOR ALL USING (auth.uid() = user_id);
@@ -136,6 +218,15 @@ CREATE POLICY "Admins can manage azan_sounds" ON azan_sounds FOR ALL USING (true
 CREATE POLICY "Anyone can insert feedback" ON feedback FOR INSERT WITH CHECK (true);
 CREATE POLICY "Admins can read all feedback" ON feedback FOR SELECT USING (true);
 CREATE POLICY "Admins can update feedback" ON feedback FOR UPDATE USING (true);
+CREATE POLICY "Anyone can read event_categories" ON event_categories FOR SELECT USING (true);
+CREATE POLICY "Admins can manage event_categories" ON event_categories FOR ALL USING (true);
+CREATE POLICY "Anyone can read approved events" ON events FOR SELECT USING (true);
+CREATE POLICY "Users can insert events" ON events FOR INSERT WITH CHECK (true);
+CREATE POLICY "Users can update own events" ON events FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own events" ON events FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Users can manage own event_responses" ON event_responses FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Anyone can read event_responses" ON event_responses FOR SELECT USING (true);
+CREATE POLICY "Users can read own trust score" ON user_trust_scores FOR SELECT USING (auth.uid() = user_id);
 `;
 
 async function handler(req, res) {
@@ -200,7 +291,35 @@ async function handler(req, res) {
     .limit(0);
   tables.feedback = !feedbackError;
 
-  if (tables.bookmarks && tables.notes && tables.prayer_checkins && tables.fcm_tokens && tables.notifications && tables.azan_sounds && tables.feedback) {
+  // Check if event_categories table exists
+  const { error: eventCategoriesError } = await supabaseAdmin
+    .from('event_categories')
+    .select('id')
+    .limit(0);
+  tables.event_categories = !eventCategoriesError;
+
+  // Check if events table exists
+  const { error: eventsError } = await supabaseAdmin
+    .from('events')
+    .select('id')
+    .limit(0);
+  tables.events = !eventsError;
+
+  // Check if event_responses table exists
+  const { error: eventResponsesError } = await supabaseAdmin
+    .from('event_responses')
+    .select('id')
+    .limit(0);
+  tables.event_responses = !eventResponsesError;
+
+  // Check if user_trust_scores table exists
+  const { error: trustError } = await supabaseAdmin
+    .from('user_trust_scores')
+    .select('user_id')
+    .limit(0);
+  tables.user_trust_scores = !trustError;
+
+  if (tables.bookmarks && tables.notes && tables.prayer_checkins && tables.fcm_tokens && tables.notifications && tables.azan_sounds && tables.feedback && tables.event_categories && tables.events && tables.event_responses && tables.user_trust_scores) {
     return res.status(200).json({
       success: true,
       message: 'All tables already exist',
