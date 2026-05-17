@@ -302,6 +302,55 @@ const apiGroups = [
       },
     ],
   },
+  {
+    name: 'Backgrounds',
+    description: 'Background images for dashboard & prayer screens (Admin upload, public list)',
+    tag: 'backgrounds',
+    endpoints: [
+      {
+        method: 'GET', path: '/api/backgrounds',
+        summary: 'List all backgrounds',
+        description: 'Returns all available background images with name, category, and image URL. Public endpoint.',
+        response: { success: true, backgrounds: [{ id: 'uuid', name: 'Sunset Mosque', category: 'dashboard', image_url: 'https://...', created_at: '...' }] },
+      },
+      {
+        method: 'POST', path: '/api/backgrounds',
+        summary: 'Save background metadata (after upload)',
+        description: 'Saves background metadata to database. Image must already be uploaded to Supabase Storage from admin panel. Category: dashboard, prayer, or both.',
+        auth: true, admin: true,
+        body: { name: 'Sunset Mosque', category: 'dashboard', image_url: 'https://storage.url/image.jpg', storage_path: 'backgrounds/image.jpg' },
+        response: { success: true, background: { id: 'uuid', name: 'Sunset Mosque', category: 'dashboard', image_url: 'https://...', storage_path: '...', uploaded_by: 'uuid', created_at: '...' } },
+      },
+      {
+        method: 'DELETE', path: '/api/backgrounds/:id',
+        summary: 'Delete a background',
+        description: 'Deletes background from both Supabase Storage and database. Admin only.',
+        auth: true, admin: true,
+        response: { success: true, message: 'Background deleted' },
+      },
+    ],
+  },
+  {
+    name: 'Azan Sounds',
+    description: 'Azan sound files for prayer notifications (Admin upload, public list)',
+    tag: 'azan-sounds',
+    endpoints: [
+      {
+        method: 'GET', path: '/api/azan-sounds',
+        summary: 'List all azan sounds',
+        description: 'Returns all available azan sounds with name, file URL, and duration. Public endpoint.',
+        response: { success: true, azanSounds: [{ id: 'uuid', name: 'Makkah Azan', file_url: 'https://...', duration_seconds: 180, created_at: '...' }] },
+      },
+      {
+        method: 'POST', path: '/api/azan-sounds',
+        summary: 'Save azan sound metadata (after upload)',
+        description: 'Saves azan sound metadata to database. Audio file must already be uploaded to Supabase Storage from admin panel.',
+        auth: true, admin: true,
+        body: { name: 'Makkah Azan', file_url: 'https://storage.url/azan.mp3', storage_path: 'azan-sounds/azan.mp3', duration_seconds: 180 },
+        response: { success: true, azanSound: { id: 'uuid', name: 'Makkah Azan', file_url: 'https://...', storage_path: '...', duration_seconds: 180, uploaded_by: 'uuid', created_at: '...' } },
+      },
+    ],
+  },
 ];
 
 function EndpointCard({ ep }) {
