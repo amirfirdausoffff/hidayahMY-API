@@ -19,9 +19,11 @@ async function handler(req, res) {
   }
 
   // Get notifications (latest 50)
+  // Show general notifications (no target) + notifications targeted to this user
   const { data, error } = await supabaseAdmin
     .from('notifications')
     .select('id, title, body, topic, created_at')
+    .or(`target_user_id.is.null,target_user_id.eq.${user.id}`)
     .order('created_at', { ascending: false })
     .limit(50);
 

@@ -93,6 +93,22 @@ CREATE TABLE IF NOT EXISTS azan_sounds (
 
 ALTER TABLE azan_sounds ENABLE ROW LEVEL SECURITY;
 
+-- Feedback table
+CREATE TABLE IF NOT EXISTS feedback (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  email TEXT NOT NULL,
+  feature TEXT NOT NULL,
+  message TEXT NOT NULL,
+  image_urls TEXT[],
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'resolved')),
+  resolved_at TIMESTAMPTZ,
+  resolved_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE feedback ENABLE ROW LEVEL SECURITY;
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_backgrounds_category ON backgrounds(category);
 CREATE INDEX IF NOT EXISTS idx_azan_sounds_created_at ON azan_sounds(created_at DESC);
@@ -102,6 +118,9 @@ CREATE INDEX IF NOT EXISTS idx_prayer_checkins_user_date ON prayer_checkins(user
 CREATE INDEX IF NOT EXISTS idx_prayer_checkins_user_date_status ON prayer_checkins(user_id, date, status) WHERE status = 1;
 CREATE INDEX IF NOT EXISTS idx_fcm_tokens_user_id ON fcm_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON feedback(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_feedback_user_id ON feedback(user_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status);
 
 -- RLS Policies
 CREATE POLICY "Users can manage own bookmarks" ON bookmarks FOR ALL USING (auth.uid() = user_id);
@@ -114,6 +133,9 @@ CREATE POLICY "Anyone can read backgrounds" ON backgrounds FOR SELECT USING (tru
 CREATE POLICY "Admins can manage backgrounds" ON backgrounds FOR ALL USING (true);
 CREATE POLICY "Anyone can read azan_sounds" ON azan_sounds FOR SELECT USING (true);
 CREATE POLICY "Admins can manage azan_sounds" ON azan_sounds FOR ALL USING (true);
+CREATE POLICY "Anyone can insert feedback" ON feedback FOR INSERT WITH CHECK (true);
+CREATE POLICY "Admins can read all feedback" ON feedback FOR SELECT USING (true);
+CREATE POLICY "Admins can update feedback" ON feedback FOR UPDATE USING (true);
 `;
 
 async function handler(req, res) {
@@ -171,7 +193,14 @@ async function handler(req, res) {
     .limit(0);
   tables.azan_sounds = !azanError;
 
-  if (tables.bookmarks && tables.notes && tables.prayer_checkins && tables.fcm_tokens && tables.notifications && tables.azan_sounds) {
+  // Check if feedback table exists
+  const { error: feedbackError } = await supabaseAdmin
+    .from('feedback')
+    .select('id')
+    .limit(0);
+  tables.feedback = !feedbackError;
+
+  if (tables.bookmarks && tables.notes && tables.prayer_checkins && tables.fcm_tokens && tables.notifications && tables.azan_sounds && tables.feedback) {
     return res.status(200).json({
       success: true,
       message: 'All tables already exist',

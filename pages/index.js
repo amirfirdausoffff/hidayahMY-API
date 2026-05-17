@@ -351,6 +351,34 @@ const apiGroups = [
       },
     ],
   },
+  {
+    name: 'Feedback',
+    description: 'Submit and manage user feedback & bug reports',
+    tag: 'feedback',
+    endpoints: [
+      {
+        method: 'POST', path: '/api/feedback',
+        summary: 'Submit feedback or bug report',
+        description: 'Submit feedback with optional images. Authentication optional - logged in users auto-linked, guests provide email manually.',
+        body: { email: 'user@example.com', feature: 'Prayer Times', message: 'The prayer times are wrong for my zone', images: ['base64_image_1', 'base64_image_2'] },
+        response: { success: true, feedback: { id: 'uuid', email: '...', feature: 'Prayer Times', message: '...', image_urls: ['https://...'], status: 'pending', created_at: '...' } },
+      },
+      {
+        method: 'GET', path: '/api/feedback',
+        summary: 'List all feedback (admin)',
+        description: 'Returns all feedback submissions ordered by newest first.',
+        auth: true, admin: true,
+        response: { success: true, feedback: [{ id: 'uuid', email: '...', feature: '...', message: '...', image_urls: [], status: 'pending', created_at: '...' }] },
+      },
+      {
+        method: 'PUT', path: '/api/feedback/:id',
+        summary: 'Mark feedback as resolved (admin)',
+        description: 'Marks feedback as resolved and sends push notification to the user who submitted it.',
+        auth: true, admin: true,
+        response: { success: true, message: 'Feedback resolved and user notified' },
+      },
+    ],
+  },
 ];
 
 function EndpointCard({ ep }) {
