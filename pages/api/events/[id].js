@@ -1,6 +1,7 @@
 import { supabase, supabaseAdmin } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
 import { sanitizeString } from '../../../src/lib/validate';
+import { messaging } from '../../../src/lib/firebase-admin';
 
 async function handler(req, res) {
   const { id } = req.query;
@@ -111,6 +112,68 @@ async function handler(req, res) {
 
     if (updateError) {
       return res.status(400).json({ success: false, error: updateError.message });
+    }
+
+    // Send notification to event creator when admin changes status
+    if (isAdmin && status && (status === 'approved' || status === 'rejected') && event.user_id) {
+      try {
+        const isApproved = status === 'approved';
+        const notifTitle = isApproved ? 'Event Approved' : 'Event Rejected';
+        const notifBody = isApproved
+          ? `Your event "${event.title}" has been approved.`
+          : `Your event "${event.title}" was rejected. Reason: ${rejection_reason || 'No reason provided'}`;
+
+        // Fetch creator's FCM tokens
+        const { data: tokens } = await supabaseAdmin
+          .from('fcm_tokens')
+          .select('fcm_token')
+          .eq('user_id', event.user_id);
+
+        if (tokens && tokens.length > 0) {
+          const fcmTokens = tokens.map((t) => t.fcm_token);
+          const fcmMessage = {
+            notification: { title: notifTitle, body: notifBody },
+            data: { type: 'event_status', event_id: id, status },
+            tokens: fcmTokens,
+            android: {
+              priority: 'high',
+              notification: { channelId: 'announcements', sound: 'default' },
+            },
+            apns: {
+              payload: { aps: { sound: 'default', badge: 1 } },
+            },
+          };
+
+          const fcmResponse = await messaging.sendEachForMulticast(fcmMessage);
+
+          // Clean up invalid tokens
+          const invalidTokens = [];
+          fcmResponse.responses.forEach((resp, idx) => {
+            if (!resp.success) {
+              const code = resp.error?.code;
+              if (code === 'messaging/invalid-registration-token' || code === 'messaging/registration-token-not-registered') {
+                invalidTokens.push(fcmTokens[idx]);
+              }
+            }
+          });
+          if (invalidTokens.length > 0) {
+            await supabaseAdmin.from('fcm_tokens').delete().in('fcm_token', invalidTokens);
+          }
+        }
+
+        // Save notification to history
+        await supabaseAdmin.from('notifications').insert({
+          title: notifTitle,
+          body: notifBody,
+          topic: 'general',
+          sent_by: user.id,
+          target_user_id: event.user_id,
+          data: { type: 'event_status', event_id: id, status },
+        });
+      } catch (notifError) {
+        console.error('[event-notification] Error:', notifError.message);
+        // Don't fail the request if notification fails
+      }
     }
 
     return res.status(200).json({ success: true, event: updated });

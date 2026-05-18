@@ -22,7 +22,7 @@ async function handler(req, res) {
   // Show general notifications (no target) + notifications targeted to this user
   const { data, error } = await supabaseAdmin
     .from('notifications')
-    .select('id, title, body, topic, created_at')
+    .select('id, title, body, topic, data, created_at')
     .or(`target_user_id.is.null,target_user_id.eq.${user.id}`)
     .order('created_at', { ascending: false })
     .limit(50);
