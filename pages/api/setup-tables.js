@@ -228,6 +228,20 @@ CREATE POLICY "Users can delete own events" ON events FOR DELETE USING (auth.uid
 CREATE POLICY "Users can manage own event_responses" ON event_responses FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Anyone can read event_responses" ON event_responses FOR SELECT USING (true);
 CREATE POLICY "Users can read own trust score" ON user_trust_scores FOR SELECT USING (auth.uid() = user_id);
+
+-- Migration: Add image_urls column to events (for existing tables)
+ALTER TABLE events ADD COLUMN IF NOT EXISTS image_urls TEXT[];
+`;
+
+const STORAGE_SETUP_SQL = `
+-- Create event-images storage bucket (run in Supabase SQL Editor)
+INSERT INTO storage.buckets (id, name, public) VALUES ('event-images', 'event-images', true) ON CONFLICT (id) DO NOTHING;
+
+-- Allow public read access to event-images
+CREATE POLICY "Public read event-images" ON storage.objects FOR SELECT USING (bucket_id = 'event-images');
+
+-- Allow authenticated users to upload to event-images
+CREATE POLICY "Auth users upload event-images" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'event-images' AND auth.role() = 'authenticated');
 `;
 
 async function handler(req, res) {
@@ -320,11 +334,21 @@ async function handler(req, res) {
     .limit(0);
   tables.user_trust_scores = !trustError;
 
+  // Try to create event-images storage bucket
+  const { error: bucketError } = await supabaseAdmin.storage.createBucket('event-images', {
+    public: true,
+    fileSizeLimit: 5 * 1024 * 1024, // 5MB
+  });
+  const storageBucket = !bucketError || bucketError.message?.includes('already exists');
+
   if (tables.bookmarks && tables.notes && tables.prayer_checkins && tables.fcm_tokens && tables.notifications && tables.azan_sounds && tables.feedback && tables.event_categories && tables.events && tables.event_responses && tables.user_trust_scores) {
     return res.status(200).json({
       success: true,
       message: 'All tables already exist',
       tables,
+      storage: { 'event-images': storageBucket },
+      migration_sql: 'ALTER TABLE events ADD COLUMN IF NOT EXISTS image_urls TEXT[];',
+      storage_sql: STORAGE_SETUP_SQL,
     });
   }
 
@@ -332,7 +356,9 @@ async function handler(req, res) {
     success: false,
     message: 'One or more tables are missing. Please run the following SQL in Supabase SQL Editor.',
     tables,
+    storage: { 'event-images': storageBucket },
     sql: SETUP_SQL,
+    storage_sql: STORAGE_SETUP_SQL,
   });
 }
 

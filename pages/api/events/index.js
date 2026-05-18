@@ -292,6 +292,12 @@ async function handler(req, res) {
     // Handle image uploads (max 2)
     let imageUrls = null;
     if (images && Array.isArray(images) && images.length > 0) {
+      // Ensure event-images bucket exists
+      await supabaseAdmin.storage.createBucket('event-images', {
+        public: true,
+        fileSizeLimit: 5 * 1024 * 1024,
+      }).catch(() => {}); // Ignore if already exists
+
       const maxImages = images.slice(0, 2);
       imageUrls = [];
 
