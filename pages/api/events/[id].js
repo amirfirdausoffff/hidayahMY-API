@@ -114,16 +114,21 @@ async function handler(req, res) {
       return res.status(400).json({ success: false, error: updateError.message });
     }
 
-    // Send notification to event creator when admin changes status
+    // Send notifications when admin changes event status
     if (isAdmin && status && (status === 'approved' || status === 'rejected') && event.user_id) {
       try {
         const isApproved = status === 'approved';
-        const notifTitle = isApproved ? 'Event Approved' : 'Event Rejected';
-        const notifBody = isApproved
+
+        // 1. Notify creator (bilingual)
+        const creatorTitleEn = isApproved ? 'Event Approved' : 'Event Rejected';
+        const creatorTitleBm = isApproved ? 'Acara Diluluskan' : 'Acara Ditolak';
+        const creatorBodyEn = isApproved
           ? `Your event "${event.title}" has been approved.`
           : `Your event "${event.title}" was rejected. Reason: ${rejection_reason || 'No reason provided'}`;
+        const creatorBodyBm = isApproved
+          ? `Acara anda "${event.title}" telah diluluskan.`
+          : `Acara anda "${event.title}" telah ditolak. Sebab: ${rejection_reason || 'Tiada sebab diberikan'}`;
 
-        // Fetch creator's FCM tokens
         const { data: tokens } = await supabaseAdmin
           .from('fcm_tokens')
           .select('fcm_token')
@@ -131,22 +136,22 @@ async function handler(req, res) {
 
         if (tokens && tokens.length > 0) {
           const fcmTokens = tokens.map((t) => t.fcm_token);
-          const fcmMessage = {
-            notification: { title: notifTitle, body: notifBody },
-            data: { type: 'event_status', event_id: id, status },
+          const fcmResponse = await messaging.sendEachForMulticast({
+            notification: { title: creatorTitleEn, body: creatorBodyEn },
+            data: {
+              type: 'event_status',
+              event_id: id,
+              status,
+              title_en: creatorTitleEn,
+              title_bm: creatorTitleBm,
+              body_en: creatorBodyEn,
+              body_bm: creatorBodyBm,
+            },
             tokens: fcmTokens,
-            android: {
-              priority: 'high',
-              notification: { channelId: 'announcements', sound: 'default' },
-            },
-            apns: {
-              payload: { aps: { sound: 'default', badge: 1 } },
-            },
-          };
+            android: { priority: 'high', notification: { channelId: 'announcements', sound: 'default' } },
+            apns: { payload: { aps: { sound: 'default', badge: 1 } } },
+          });
 
-          const fcmResponse = await messaging.sendEachForMulticast(fcmMessage);
-
-          // Clean up invalid tokens
           const invalidTokens = [];
           fcmResponse.responses.forEach((resp, idx) => {
             if (!resp.success) {
@@ -161,18 +166,63 @@ async function handler(req, res) {
           }
         }
 
-        // Save notification to history
+        // Save creator notification
         await supabaseAdmin.from('notifications').insert({
-          title: notifTitle,
-          body: notifBody,
+          title: creatorTitleEn,
+          body: creatorBodyEn,
           topic: 'general',
           sent_by: user.id,
           target_user_id: event.user_id,
-          data: { type: 'event_status', event_id: id, status },
+          data: {
+            type: 'event_status',
+            event_id: id,
+            status,
+            title_en: creatorTitleEn,
+            title_bm: creatorTitleBm,
+            body_en: creatorBodyEn,
+            body_bm: creatorBodyBm,
+          },
         });
+
+        // 2. Broadcast to all users if approved (new event announcement)
+        if (isApproved) {
+          const broadcastTitleEn = 'New Event';
+          const broadcastTitleBm = 'Acara Baharu';
+          const broadcastBodyEn = `"${event.title}" at ${event.location_name}`;
+          const broadcastBodyBm = `"${event.title}" di ${event.location_name}`;
+
+          await messaging.send({
+            notification: { title: broadcastTitleEn, body: broadcastBodyEn },
+            data: {
+              type: 'new_event',
+              event_id: id,
+              title_en: broadcastTitleEn,
+              title_bm: broadcastTitleBm,
+              body_en: broadcastBodyEn,
+              body_bm: broadcastBodyBm,
+            },
+            topic: 'general',
+            android: { priority: 'high', notification: { channelId: 'announcements', sound: 'default' } },
+            apns: { payload: { aps: { sound: 'default', badge: 1 } } },
+          });
+
+          await supabaseAdmin.from('notifications').insert({
+            title: broadcastTitleEn,
+            body: broadcastBodyEn,
+            topic: 'general',
+            sent_by: user.id,
+            data: {
+              type: 'new_event',
+              event_id: id,
+              title_en: broadcastTitleEn,
+              title_bm: broadcastTitleBm,
+              body_en: broadcastBodyEn,
+              body_bm: broadcastBodyBm,
+            },
+          });
+        }
       } catch (notifError) {
         console.error('[event-notification] Error:', notifError.message);
-        // Don't fail the request if notification fails
       }
     }
 

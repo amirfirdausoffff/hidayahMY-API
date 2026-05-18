@@ -1,6 +1,7 @@
 import { supabase, supabaseAdmin } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
 import { sanitizeString } from '../../../src/lib/validate';
+import { messaging } from '../../../src/lib/firebase-admin';
 
 export const config = {
   api: {
@@ -368,6 +369,48 @@ async function handler(req, res) {
 
     if (insertError) {
       return res.status(400).json({ success: false, error: insertError.message });
+    }
+
+    // Broadcast notification to all users if auto-approved
+    if (eventStatus === 'approved') {
+      try {
+        const titleEn = 'New Event';
+        const titleBm = 'Acara Baharu';
+        const bodyEn = `"${cleanTitle}" at ${cleanLocationName}`;
+        const bodyBm = `"${cleanTitle}" di ${cleanLocationName}`;
+
+        await messaging.send({
+          notification: { title: titleEn, body: bodyEn },
+          data: {
+            type: 'new_event',
+            event_id: event.id,
+            title_en: titleEn,
+            title_bm: titleBm,
+            body_en: bodyEn,
+            body_bm: bodyBm,
+          },
+          topic: 'general',
+          android: { priority: 'high', notification: { channelId: 'announcements', sound: 'default' } },
+          apns: { payload: { aps: { sound: 'default', badge: 1 } } },
+        });
+
+        await supabaseAdmin.from('notifications').insert({
+          title: titleEn,
+          body: bodyEn,
+          topic: 'general',
+          sent_by: user.id,
+          data: {
+            type: 'new_event',
+            event_id: event.id,
+            title_en: titleEn,
+            title_bm: titleBm,
+            body_en: bodyEn,
+            body_bm: bodyBm,
+          },
+        });
+      } catch (notifError) {
+        console.error('[event-broadcast] Error:', notifError.message);
+      }
     }
 
     return res.status(201).json({ success: true, event, _debug: debugInfo });
