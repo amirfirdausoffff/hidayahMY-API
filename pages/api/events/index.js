@@ -291,18 +291,27 @@ async function handler(req, res) {
 
     // Handle image uploads (max 2)
     let imageUrls = null;
+    const debugInfo = {
+      hasImages: !!images,
+      isArray: Array.isArray(images),
+      imageCount: Array.isArray(images) ? images.length : 0,
+      firstImageLength: Array.isArray(images) && images.length > 0 ? images[0]?.length : 0,
+    };
+
     if (images && Array.isArray(images) && images.length > 0) {
       // Ensure event-images bucket exists
-      await supabaseAdmin.storage.createBucket('event-images', {
+      const { error: bucketError } = await supabaseAdmin.storage.createBucket('event-images', {
         public: true,
         fileSizeLimit: 5 * 1024 * 1024,
-      }).catch(() => {}); // Ignore if already exists
+      });
+      debugInfo.bucketError = bucketError?.message || null;
 
       const maxImages = images.slice(0, 2);
       imageUrls = [];
 
       for (let i = 0; i < maxImages.length; i++) {
         const buffer = Buffer.from(maxImages[i], 'base64');
+        debugInfo[`image${i}_bufferSize`] = buffer.length;
         const filePath = `events/${user.id}/${Date.now()}_${i}.jpg`;
 
         const { error: uploadError } = await supabaseAdmin.storage
@@ -313,7 +322,7 @@ async function handler(req, res) {
           });
 
         if (uploadError) {
-          return res.status(400).json({ success: false, error: `Image upload failed: ${uploadError.message}` });
+          return res.status(400).json({ success: false, error: `Image upload failed: ${uploadError.message}`, debug: debugInfo });
         }
 
         const { data: urlData } = supabaseAdmin.storage
@@ -355,7 +364,7 @@ async function handler(req, res) {
       return res.status(400).json({ success: false, error: insertError.message });
     }
 
-    return res.status(201).json({ success: true, event });
+    return res.status(201).json({ success: true, event, _debug: debugInfo });
   }
 
   return res.status(405).json({ success: false, error: 'Method not allowed' });
