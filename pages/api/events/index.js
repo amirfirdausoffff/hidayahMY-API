@@ -2,6 +2,14 @@ import { supabase, supabaseAdmin } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
 import { sanitizeString } from '../../../src/lib/validate';
 
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb',
+    },
+  },
+};
+
 function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -177,7 +185,7 @@ async function handler(req, res) {
     const {
       title, description, event_type, location_name, latitude, longitude,
       start_date, end_date, is_recurring, recurrence_rule, audience,
-      tags, category_id, force,
+      tags, category_id, force, images,
     } = req.body;
 
     // Validate required fields
@@ -281,6 +289,35 @@ async function handler(req, res) {
     const cleanDescription = sanitizeString(description, 2000);
     const cleanLocationName = sanitizeString(location_name, 300);
 
+    // Handle image uploads (max 2)
+    let imageUrls = null;
+    if (images && Array.isArray(images) && images.length > 0) {
+      const maxImages = images.slice(0, 2);
+      imageUrls = [];
+
+      for (let i = 0; i < maxImages.length; i++) {
+        const buffer = Buffer.from(maxImages[i], 'base64');
+        const filePath = `events/${user.id}/${Date.now()}_${i}.jpg`;
+
+        const { error: uploadError } = await supabaseAdmin.storage
+          .from('event-images')
+          .upload(filePath, buffer, {
+            contentType: 'image/jpeg',
+            upsert: false,
+          });
+
+        if (uploadError) {
+          return res.status(400).json({ success: false, error: `Image upload failed: ${uploadError.message}` });
+        }
+
+        const { data: urlData } = supabaseAdmin.storage
+          .from('event-images')
+          .getPublicUrl(filePath);
+
+        imageUrls.push(urlData.publicUrl);
+      }
+    }
+
     const insertData = {
       user_id: user.id,
       title: cleanTitle,
@@ -297,6 +334,7 @@ async function handler(req, res) {
       tags: Array.isArray(tags) ? tags.map(t => sanitizeString(t, 50)) : [],
       category_id: category_id || null,
       status: eventStatus,
+      image_urls: imageUrls,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };

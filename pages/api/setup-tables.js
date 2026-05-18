@@ -152,6 +152,7 @@ CREATE TABLE IF NOT EXISTS events (
   tags TEXT[] DEFAULT '{}',
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'reported', 'expired')),
   rejection_reason TEXT,
+  image_urls TEXT[],
   verified_count INT DEFAULT 0,
   report_count INT DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now(),
