@@ -118,6 +118,7 @@ async function handler(req, res) {
       }
 
       results = results
+        .filter(event => event.latitude != null && event.longitude != null)
         .map(event => ({
           ...event,
           distance_km: haversine(userLat, userLng, event.latitude, event.longitude),
@@ -189,23 +190,27 @@ async function handler(req, res) {
     } = req.body;
 
     // Validate required fields
-    if (!title || !description || !event_type || !location_name || latitude == null || longitude == null || !start_date) {
+    if (!title || !description || !event_type || !location_name || !start_date) {
       return res.status(400).json({
         success: false,
-        error: 'title, description, event_type, location_name, latitude, longitude, and start_date are required',
+        error: 'title, description, event_type, location_name, and start_date are required',
       });
     }
 
-    const lat = parseFloat(latitude);
-    const lng = parseFloat(longitude);
+    let lat = null;
+    let lng = null;
+    if (latitude != null && longitude != null) {
+      lat = parseFloat(latitude);
+      lng = parseFloat(longitude);
 
-    if (isNaN(lat) || isNaN(lng)) {
-      return res.status(400).json({ success: false, error: 'Invalid latitude or longitude' });
-    }
+      if (isNaN(lat) || isNaN(lng)) {
+        return res.status(400).json({ success: false, error: 'Invalid latitude or longitude' });
+      }
 
-    // Validate Malaysia coordinates (roughly)
-    if (lat < 1.0 || lat > 7.5 || lng < 99.5 || lng > 119.5) {
-      return res.status(400).json({ success: false, error: 'Coordinates must be within Malaysia' });
+      // Validate Malaysia coordinates (roughly)
+      if (lat < 1.0 || lat > 7.5 || lng < 99.5 || lng > 119.5) {
+        return res.status(400).json({ success: false, error: 'Coordinates must be within Malaysia' });
+      }
     }
 
     // Validate start_date
@@ -252,8 +257,8 @@ async function handler(req, res) {
       });
     }
 
-    // Duplicate detection 2: Nearby + similar time + similar title (skip if force)
-    if (!force) {
+    // Duplicate detection 2: Nearby + similar time + similar title (skip if force, skip if no coordinates)
+    if (!force && lat != null && lng != null) {
       const twoHoursMs = 2 * 60 * 60 * 1000;
       const searchStart = new Date(startDateObj.getTime() - twoHoursMs).toISOString();
       const searchEnd = new Date(startDateObj.getTime() + twoHoursMs).toISOString();
@@ -267,6 +272,7 @@ async function handler(req, res) {
 
       if (nearbyEvents && nearbyEvents.length > 0) {
         for (const existing of nearbyEvents) {
+          if (existing.latitude == null || existing.longitude == null) continue;
           const dist = haversine(lat, lng, existing.latitude, existing.longitude);
           const sim = similarity(title, existing.title);
           if (dist <= 0.5 && sim > 0.7) {
