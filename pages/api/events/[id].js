@@ -149,7 +149,7 @@ async function handler(req, res) {
             },
             tokens: fcmTokens,
             android: { priority: 'high', notification: { channelId: 'announcements', sound: 'default' } },
-            apns: { payload: { aps: { sound: 'default', badge: 1 } } },
+            apns: { headers: { 'apns-priority': '10' }, payload: { aps: { sound: 'default', badge: 1, 'content-available': 1 } } },
           });
 
           const invalidTokens = [];
@@ -203,7 +203,7 @@ async function handler(req, res) {
             },
             topic: 'general',
             android: { priority: 'high', notification: { channelId: 'announcements', sound: 'default' } },
-            apns: { payload: { aps: { sound: 'default', badge: 1 } } },
+            apns: { headers: { 'apns-priority': '10' }, payload: { aps: { sound: 'default', badge: 1, 'content-available': 1 } } },
           });
 
           await supabaseAdmin.from('notifications').insert({

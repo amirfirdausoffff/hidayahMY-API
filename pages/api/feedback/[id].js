@@ -72,7 +72,8 @@ async function handler(req, res) {
             notification: { channelId: 'announcements', sound: 'default' },
           },
           apns: {
-            payload: { aps: { sound: 'default', badge: 1 } },
+            headers: { 'apns-priority': '10' },
+            payload: { aps: { sound: 'default', badge: 1, 'content-available': 1 } },
           },
         };
 
