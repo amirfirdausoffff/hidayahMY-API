@@ -1,5 +1,6 @@
 import { supabase, supabaseAdmin } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
+import { messaging } from '../../../src/lib/firebase-admin';
 
 async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -70,6 +71,38 @@ async function handler(req, res) {
 
   if (updateError) {
     return res.status(400).json({ success: false, error: updateError.message });
+  }
+
+  // Send congratulatory push notification on completion
+  if (isFullyCompleted) {
+    try {
+      const { data: tokens } = await supabaseAdmin
+        .from('fcm_tokens')
+        .select('fcm_token')
+        .eq('user_id', user.id);
+
+      if (tokens && tokens.length > 0) {
+        const fcmTokens = tokens.map((t) => t.fcm_token);
+        await messaging.sendEachForMulticast({
+          notification: {
+            title: 'Tahniah! Khatam Al-Quran! 🎉',
+            body: 'Alhamdulillah, anda telah berjaya khatam Al-Quran. Semoga Allah memberkati usaha anda.',
+          },
+          data: { type: 'khatam_completed' },
+          tokens: fcmTokens,
+          android: {
+            priority: 'high',
+            notification: { channelId: 'announcements', sound: 'default' },
+          },
+          apns: {
+            headers: { 'apns-priority': '10' },
+            payload: { aps: { sound: 'default', badge: 1, 'content-available': 1 } },
+          },
+        });
+      }
+    } catch (e) {
+      console.error('[khatam/mark] FCM notification error:', e.message);
+    }
   }
 
   return res.status(200).json({
