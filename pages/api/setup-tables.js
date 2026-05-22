@@ -229,6 +229,25 @@ CREATE POLICY "Users can manage own event_responses" ON event_responses FOR ALL 
 CREATE POLICY "Anyone can read event_responses" ON event_responses FOR SELECT USING (true);
 CREATE POLICY "Users can read own trust score" ON user_trust_scores FOR SELECT USING (auth.uid() = user_id);
 
+-- Khatam Quran progress tracking
+CREATE TABLE IF NOT EXISTS khatam_progress (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  start_date date NOT NULL,
+  target_date date NOT NULL,
+  completed_surahs jsonb DEFAULT '{}',
+  is_completed boolean DEFAULT false,
+  completed_at timestamptz,
+  status text DEFAULT 'active' CHECK (status IN ('active', 'completed', 'abandoned')),
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE khatam_progress ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage own khatam_progress" ON khatam_progress FOR ALL USING (auth.uid() = user_id);
+CREATE INDEX IF NOT EXISTS idx_khatam_progress_user_id ON khatam_progress(user_id);
+CREATE INDEX IF NOT EXISTS idx_khatam_progress_user_status ON khatam_progress(user_id, status);
+
 -- Migration: Add image_urls column to events (for existing tables)
 ALTER TABLE events ADD COLUMN IF NOT EXISTS image_urls TEXT[];
 `;
@@ -334,6 +353,13 @@ async function handler(req, res) {
     .limit(0);
   tables.user_trust_scores = !trustError;
 
+  // Check if khatam_progress table exists
+  const { error: khatamError } = await supabaseAdmin
+    .from('khatam_progress')
+    .select('id')
+    .limit(0);
+  tables.khatam_progress = !khatamError;
+
   // Try to create event-images storage bucket
   const { error: bucketError } = await supabaseAdmin.storage.createBucket('event-images', {
     public: true,
@@ -341,7 +367,7 @@ async function handler(req, res) {
   });
   const storageBucket = !bucketError || bucketError.message?.includes('already exists');
 
-  if (tables.bookmarks && tables.notes && tables.prayer_checkins && tables.fcm_tokens && tables.notifications && tables.azan_sounds && tables.feedback && tables.event_categories && tables.events && tables.event_responses && tables.user_trust_scores) {
+  if (tables.bookmarks && tables.notes && tables.prayer_checkins && tables.fcm_tokens && tables.notifications && tables.azan_sounds && tables.feedback && tables.event_categories && tables.events && tables.event_responses && tables.user_trust_scores && tables.khatam_progress) {
     return res.status(200).json({
       success: true,
       message: 'All tables already exist',
