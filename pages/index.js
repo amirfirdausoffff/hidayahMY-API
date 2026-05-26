@@ -634,7 +634,7 @@ export default function Home() {
             </p>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '12px', padding: '4px 12px', borderRadius: '12px', background: '#e8f5e9', color: '#2e7d32', fontWeight: '600' }}>Base URL: https://api.hidayahmy.com</span>
-              <span style={{ fontSize: '12px', padding: '4px 12px', borderRadius: '12px', background: '#e3f2fd', color: '#1565c0', fontWeight: '600' }}>Auth: Supabase JWT + API Key</span>
+              <span style={{ fontSize: '12px', padding: '4px 12px', borderRadius: '12px', background: '#e3f2fd', color: '#1565c0', fontWeight: '600' }}>Auth: Supabase JWT</span>
               <span style={{ fontSize: '12px', padding: '4px 12px', borderRadius: '12px', background: '#fff3e0', color: '#e65100', fontWeight: '600' }}>Format: JSON</span>
             </div>
           </div>
@@ -642,17 +642,6 @@ export default function Home() {
 
         {/* Content */}
         <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '32px' }}>
-          {/* API Key info */}
-          <div style={{ background: '#fff', borderRadius: '8px', border: '1px solid #e0e0e0', padding: '20px', marginBottom: '32px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#263238', margin: '0 0 12px' }}>API Key Authentication</h3>
-            <p style={{ fontSize: '13px', color: '#607d8b', margin: '0 0 12px' }}>
-              All API requests require a valid API key sent via the <code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: '4px', fontSize: '12px' }}>X-API-Key</code> header.
-            </p>
-            <code style={{ fontSize: '13px', background: '#263238', color: '#80cbc4', padding: '8px 14px', borderRadius: '6px', display: 'block' }}>
-              X-API-Key: {'<your_api_key>'}
-            </code>
-          </div>
-
           {/* Role info */}
           <div style={{ background: '#fff', borderRadius: '8px', border: '1px solid #e0e0e0', padding: '20px', marginBottom: '32px' }}>
             <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#263238', margin: '0 0 12px' }}>Roles</h3>

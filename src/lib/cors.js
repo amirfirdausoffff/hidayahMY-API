@@ -1,5 +1,3 @@
-import { apiAuth } from './api-auth';
-
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '*').split(',').map(s => s.trim());
 
 export function cors(handler) {
@@ -15,7 +13,7 @@ export function cors(handler) {
     }
 
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Key');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
 
     if (req.method === 'OPTIONS') {
@@ -23,7 +21,6 @@ export function cors(handler) {
       return;
     }
 
-    // Enforce API key authentication on all requests
-    return apiAuth(handler)(req, res);
+    return handler(req, res);
   };
 }
