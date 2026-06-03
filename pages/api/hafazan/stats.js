@@ -98,7 +98,7 @@ async function handler(req, res) {
     .from('hafazan_reviews')
     .select('id, entry_id, user_id, rating, notes, created_at')
     .order('created_at', { ascending: false })
-    .limit(10);
+    .limit(50);
 
   // Resolve user IDs to emails
   let recentWithEmail = recentReviews || [];
