@@ -248,6 +248,42 @@ CREATE POLICY "Users can manage own khatam_progress" ON khatam_progress FOR ALL 
 CREATE INDEX IF NOT EXISTS idx_khatam_progress_user_id ON khatam_progress(user_id);
 CREATE INDEX IF NOT EXISTS idx_khatam_progress_user_status ON khatam_progress(user_id, status);
 
+-- Hafazan (Quran memorization) entries
+CREATE TABLE IF NOT EXISTS hafazan_entries (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  surah_number int NOT NULL CHECK (surah_number >= 1 AND surah_number <= 114),
+  start_ayah int NOT NULL CHECK (start_ayah >= 1),
+  end_ayah int NOT NULL CHECK (end_ayah >= 1),
+  status text DEFAULT 'memorizing' CHECK (status IN ('memorizing', 'memorized')),
+  strength text DEFAULT 'weak' CHECK (strength IN ('weak', 'medium', 'strong')),
+  review_count int DEFAULT 0,
+  last_reviewed_at timestamptz,
+  next_review_at timestamptz,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- Hafazan review logs
+CREATE TABLE IF NOT EXISTS hafazan_reviews (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  entry_id uuid NOT NULL REFERENCES hafazan_entries(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  rating int NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  notes text,
+  created_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE hafazan_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE hafazan_reviews ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage own hafazan_entries" ON hafazan_entries FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Users can manage own hafazan_reviews" ON hafazan_reviews FOR ALL USING (auth.uid() = user_id);
+CREATE INDEX IF NOT EXISTS idx_hafazan_entries_user_id ON hafazan_entries(user_id);
+CREATE INDEX IF NOT EXISTS idx_hafazan_entries_user_status ON hafazan_entries(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_hafazan_entries_next_review ON hafazan_entries(user_id, next_review_at);
+CREATE INDEX IF NOT EXISTS idx_hafazan_reviews_entry_id ON hafazan_reviews(entry_id);
+CREATE INDEX IF NOT EXISTS idx_hafazan_reviews_user_id ON hafazan_reviews(user_id);
+
 -- Migration: Add image_urls column to events (for existing tables)
 ALTER TABLE events ADD COLUMN IF NOT EXISTS image_urls TEXT[];
 `;
@@ -360,6 +396,20 @@ async function handler(req, res) {
     .limit(0);
   tables.khatam_progress = !khatamError;
 
+  // Check if hafazan_entries table exists
+  const { error: hafazanEntriesError } = await supabaseAdmin
+    .from('hafazan_entries')
+    .select('id')
+    .limit(0);
+  tables.hafazan_entries = !hafazanEntriesError;
+
+  // Check if hafazan_reviews table exists
+  const { error: hafazanReviewsError } = await supabaseAdmin
+    .from('hafazan_reviews')
+    .select('id')
+    .limit(0);
+  tables.hafazan_reviews = !hafazanReviewsError;
+
   // Try to create event-images storage bucket
   const { error: bucketError } = await supabaseAdmin.storage.createBucket('event-images', {
     public: true,
@@ -367,7 +417,7 @@ async function handler(req, res) {
   });
   const storageBucket = !bucketError || bucketError.message?.includes('already exists');
 
-  if (tables.bookmarks && tables.notes && tables.prayer_checkins && tables.fcm_tokens && tables.notifications && tables.azan_sounds && tables.feedback && tables.event_categories && tables.events && tables.event_responses && tables.user_trust_scores && tables.khatam_progress) {
+  if (tables.bookmarks && tables.notes && tables.prayer_checkins && tables.fcm_tokens && tables.notifications && tables.azan_sounds && tables.feedback && tables.event_categories && tables.events && tables.event_responses && tables.user_trust_scores && tables.khatam_progress && tables.hafazan_entries && tables.hafazan_reviews) {
     return res.status(200).json({
       success: true,
       message: 'All tables already exist',
