@@ -1,20 +1,23 @@
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '*').split(',').map(s => s.trim());
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'https://hidayahmy.com,https://www.hidayahmy.com,https://admin.hidayahmy.com,https://api.hidayahmy.com').split(',').map(s => s.trim());
 
 export function cors(handler) {
   return async (req, res) => {
     const origin = req.headers.origin;
 
-    // Set CORS origin — allow specific origins or * for mobile apps
-    if (ALLOWED_ORIGINS.includes('*')) {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-    } else if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    // Allow requests with no origin (mobile apps, server-to-server)
+    // For browser requests, only allow specific origins
+    if (origin && ALLOWED_ORIGINS.includes(origin)) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Vary', 'Origin');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    } else if (!origin) {
+      // No origin = mobile app or server call — allow
+      res.setHeader('Access-Control-Allow-Origin', '*');
     }
+    // If origin is set but not in whitelist — no CORS header = browser blocks it
 
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
 
     if (req.method === 'OPTIONS') {
       res.status(200).end();

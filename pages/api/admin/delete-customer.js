@@ -1,5 +1,6 @@
 import { supabase, supabaseAdmin } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
+import { checkRateLimit, getClientIp } from '../../../src/lib/rate-limit';
 
 async function handler(req, res) {
   if (req.method !== 'DELETE') {
@@ -20,6 +21,13 @@ async function handler(req, res) {
 
   if (user.user_metadata?.role !== 'admin') {
     return res.status(403).json({ success: false, error: 'Admin access required' });
+  }
+
+  // Rate limit: 5 delete attempts per 5 minutes
+  const ip = getClientIp(req);
+  const { allowed } = checkRateLimit(`admin-delete:${ip}`, 5, 5 * 60 * 1000);
+  if (!allowed) {
+    return res.status(429).json({ success: false, error: 'Too many attempts. Try again later.' });
   }
 
   const { user_id, admin_password } = req.body;
