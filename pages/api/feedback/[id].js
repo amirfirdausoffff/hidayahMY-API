@@ -24,6 +24,11 @@ async function handler(req, res) {
   }
 
   const { id } = req.query;
+  const { resolve_message } = req.body || {};
+
+  if (!resolve_message || !resolve_message.trim()) {
+    return res.status(400).json({ success: false, error: 'Resolution message is required' });
+  }
 
   // Get feedback by id
   const { data: feedback, error: fetchError } = await supabaseAdmin
@@ -43,6 +48,7 @@ async function handler(req, res) {
       status: 'resolved',
       resolved_at: new Date().toISOString(),
       resolved_by: user.id,
+      resolve_message: resolve_message.trim(),
     })
     .eq('id', id);
 
@@ -65,7 +71,7 @@ async function handler(req, res) {
           tokens: fcmTokens,
           notification: {
             title: 'Feedback Resolved',
-            body: `Your feedback about ${feedback.feature} has been resolved. Thank you!`,
+            body: resolve_message.trim(),
           },
           android: {
             priority: 'high',
@@ -106,7 +112,7 @@ async function handler(req, res) {
         .from('notifications')
         .insert({
           title: 'Feedback Resolved',
-          body: `Your feedback about ${feedback.feature} has been resolved. Thank you!`,
+          body: resolve_message.trim(),
           topic: 'feedback',
           sent_by: user.id,
           target_user_id: feedback.user_id,
