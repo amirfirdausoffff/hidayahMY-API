@@ -100,6 +100,24 @@ async function handler(req, res) {
     .order('created_at', { ascending: false })
     .limit(10);
 
+  // Resolve user IDs to emails
+  let recentWithEmail = recentReviews || [];
+  if (recentReviews && recentReviews.length > 0) {
+    const userIds = [...new Set(recentReviews.map(r => r.user_id))];
+    const { data: { users } } = await supabaseAdmin.auth.admin.listUsers();
+    const userMap = {};
+    if (users) {
+      users.forEach(u => {
+        userMap[u.id] = { email: u.email || '', name: u.user_metadata?.name || '' };
+      });
+    }
+    recentWithEmail = recentReviews.map(r => ({
+      ...r,
+      email: userMap[r.user_id]?.email || '',
+      name: userMap[r.user_id]?.name || '',
+    }));
+  }
+
   return res.status(200).json({
     success: true,
     stats: {
@@ -112,7 +130,7 @@ async function handler(req, res) {
       total_reviews: totalReviews,
       avg_rating: avgRating,
       top_memorized_surahs: topSurahs,
-      recent_activity: recentReviews || [],
+      recent_activity: recentWithEmail,
     },
   });
 }
