@@ -2,6 +2,7 @@ import { supabase, supabaseAdmin } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
 import { sanitizeString } from '../../../src/lib/validate';
 import { messaging } from '../../../src/lib/firebase-admin';
+import { notifyNewEvent } from '../../../src/lib/admin-notify';
 
 export const config = {
   api: {
@@ -370,6 +371,14 @@ async function handler(req, res) {
     if (insertError) {
       return res.status(400).json({ success: false, error: insertError.message });
     }
+
+    notifyNewEvent({
+      title: cleanTitle,
+      location: cleanLocationName,
+      userName: user.user_metadata?.name || '',
+      userEmail: user.email,
+      status: eventStatus,
+    });
 
     // Broadcast notification to all users if auto-approved
     if (eventStatus === 'approved') {

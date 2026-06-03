@@ -1,5 +1,6 @@
 import { supabase, supabaseAdmin } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
+import { notifyNewFeedback } from '../../../src/lib/admin-notify';
 
 export const config = {
   api: {
@@ -75,6 +76,8 @@ async function handler(req, res) {
     if (error) {
       return res.status(400).json({ success: false, error: error.message });
     }
+
+    notifyNewFeedback({ email, feature, message });
 
     return res.status(201).json({ success: true, feedback: data });
   }

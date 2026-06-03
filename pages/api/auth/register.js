@@ -2,6 +2,7 @@ import { supabase } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
 import { isValidEmail, sanitizeString, safeError } from '../../../src/lib/validate';
 import { checkRateLimit, getClientIp } from '../../../src/lib/rate-limit';
+import { notifyNewUser } from '../../../src/lib/admin-notify';
 
 async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -38,6 +39,8 @@ async function handler(req, res) {
   if (error) {
     return res.status(400).json({ success: false, error: safeError(error, 'Registration failed') });
   }
+
+  notifyNewUser({ email, name: safeName, provider: null });
 
   return res.status(201).json({
     success: true,

@@ -1,5 +1,6 @@
 import { supabase } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
+import { notifyNewUser } from '../../../src/lib/admin-notify';
 
 async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -35,6 +36,17 @@ async function handler(req, res) {
 
   if (error) {
     return res.status(401).json({ success: false, error: error.message });
+  }
+
+  // Notify admin if this is a new user (created within last 60 seconds)
+  const createdAt = new Date(data.user.created_at);
+  const isNewUser = (Date.now() - createdAt.getTime()) < 60000;
+  if (isNewUser) {
+    notifyNewUser({
+      email: data.user.email,
+      name: data.user.user_metadata?.full_name || data.user.user_metadata?.name || '',
+      provider,
+    });
   }
 
   return res.status(200).json({
