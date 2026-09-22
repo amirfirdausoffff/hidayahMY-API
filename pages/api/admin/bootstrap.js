@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '../../../src/lib/supabase';
+import { supabaseAdmin, listAllUsers } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
 import { isValidEmail, safeError } from '../../../src/lib/validate';
 import { checkRateLimit, getClientIp } from '../../../src/lib/rate-limit';
@@ -28,8 +28,8 @@ async function handler(req, res) {
 
   // Action: set-role — set an existing user as admin
   if (action === 'set-role') {
-    const { data: listData } = await supabaseAdmin.auth.admin.listUsers();
-    const user = listData?.users?.find(u => u.email === email);
+    const { users } = await listAllUsers();
+    const user = users.find(u => u.email === email);
 
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });

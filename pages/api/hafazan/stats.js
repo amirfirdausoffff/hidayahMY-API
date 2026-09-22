@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin } from '../../../src/lib/supabase';
+import { supabase, supabaseAdmin, listAllUsers } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
 
 // Surah names for display in admin
@@ -104,7 +104,7 @@ async function handler(req, res) {
   let recentWithEmail = recentReviews || [];
   if (recentReviews && recentReviews.length > 0) {
     const userIds = [...new Set(recentReviews.map(r => r.user_id))];
-    const { data: { users } } = await supabaseAdmin.auth.admin.listUsers();
+    const { users } = await listAllUsers();
     const userMap = {};
     if (users) {
       users.forEach(u => {

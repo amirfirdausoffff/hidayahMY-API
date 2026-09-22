@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin } from '../../../src/lib/supabase';
+import { supabase, listAllUsers } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
 
 async function handler(req, res) {
@@ -24,7 +24,7 @@ async function handler(req, res) {
 
   const { role } = req.query;
 
-  const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers();
+  const { users, error } = await listAllUsers();
 
   if (error) {
     return res.status(500).json({ success: false, error: error.message });
@@ -41,6 +41,7 @@ async function handler(req, res) {
     email: u.email,
     name: u.user_metadata?.name || '',
     role: u.user_metadata?.role || '',
+    provider: u.app_metadata?.provider || '',
     created_at: u.created_at,
     avatar_url: u.user_metadata?.avatar_url || '',
   }));

@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin } from '../../../src/lib/supabase';
+import { supabase, supabaseAdmin, listAllUsers } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
 
 async function handler(req, res) {
@@ -207,9 +207,7 @@ async function handler(req, res) {
     let todayUsers = [];
 
     if (userIds.length > 0) {
-      const { data: { users: authUsers }, error: usersError } = await supabaseAdmin.auth.admin.listUsers({
-        perPage: 1000,
-      });
+      const { users: authUsers, error: usersError } = await listAllUsers();
 
       if (!usersError && authUsers) {
         const userEmailMap = {};

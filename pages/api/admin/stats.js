@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin } from '../../../src/lib/supabase';
+import { supabase, listAllUsers } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
 
 async function handler(req, res) {
@@ -22,7 +22,7 @@ async function handler(req, res) {
     return res.status(403).json({ success: false, error: 'Admin access required' });
   }
 
-  const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers();
+  const { users, error } = await listAllUsers();
 
   if (error) {
     return res.status(500).json({ success: false, error: error.message });
