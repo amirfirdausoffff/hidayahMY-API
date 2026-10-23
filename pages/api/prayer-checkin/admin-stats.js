@@ -28,6 +28,7 @@ async function handler(req, res) {
 
   try {
     let analytics = {};
+    let selectedCheckins = [];
 
     if (period === 'daily') {
       // Get stats for a specific day
@@ -38,6 +39,7 @@ async function handler(req, res) {
         .eq('status', 1);
 
       if (error) throw error;
+      selectedCheckins = checkins;
 
       const userMap = {};
       checkins.forEach((c) => {
@@ -79,6 +81,7 @@ async function handler(req, res) {
         .eq('status', 1);
 
       if (error) throw error;
+      selectedCheckins = checkins.filter((c) => c.date === targetDate);
 
       // Daily breakdown for the week
       const dailyStats = {};
@@ -137,6 +140,7 @@ async function handler(req, res) {
         .eq('status', 1);
 
       if (error) throw error;
+      selectedCheckins = checkins.filter((c) => c.date === targetDate);
 
       // Weekly breakdown within the month
       const weeklyStats = [];
@@ -188,13 +192,7 @@ async function handler(req, res) {
     }
 
     // Get today's active users with emails (for the "checked today" list)
-    const { data: todayCheckins, error: todayError } = await supabaseAdmin
-      .from('prayer_checkins')
-      .select('user_id, prayer')
-      .eq('date', targetDate)
-      .eq('status', 1);
-
-    if (todayError) throw todayError;
+    const todayCheckins = selectedCheckins;
 
     const todayUserMap = {};
     todayCheckins.forEach((c) => {
