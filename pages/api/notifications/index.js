@@ -18,12 +18,25 @@ async function handler(req, res) {
     return res.status(401).json({ success: false, error: 'Invalid or expired token' });
   }
 
+  const platform = req.query.platform;
+  if (platform && !['android', 'ios'].includes(platform)) {
+    return res.status(400).json({ success: false, error: 'Invalid platform' });
+  }
+
   // Get notifications (latest 50)
   // Show general notifications (no target) + notifications targeted to this user
-  const { data, error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from('notifications')
     .select('id, title, body, topic, data, created_at')
-    .or(`target_user_id.is.null,target_user_id.eq.${user.id}`)
+    .or(`target_user_id.is.null,target_user_id.eq.${user.id}`);
+
+  // Legacy app versions omit platform: show only cross-platform notifications.
+  // Never leak an Android-only notification into the iOS in-app history (or vice versa).
+  query = platform
+    ? query.or(`data->>target_platform.is.null,data->>target_platform.eq.${platform}`)
+    : query.is('data->>target_platform', null);
+
+  const { data, error } = await query
     .order('created_at', { ascending: false })
     .limit(50);
 
