@@ -2,7 +2,6 @@ import { supabase, supabaseAdmin } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
 import { messaging } from '../../../src/lib/firebase-admin';
 import { sanitizeString } from '../../../src/lib/validate';
-import { getTopicMigration, OS_TOPICS } from '../../../src/lib/os-notification-topics';
 
 async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -29,13 +28,9 @@ async function handler(req, res) {
   const rawBody = req.body.body;
   const { topic, user_id } = req.body;
   const platform = req.body.platform || 'all';
-  const delivery = req.body.delivery || 'legacy';
 
   if (!['all', 'android', 'ios'].includes(platform)) {
     return res.status(400).json({ success: false, error: 'Invalid platform' });
-  }
-  if (!['legacy', 'os_topic'].includes(delivery) || (delivery === 'os_topic' && (user_id || platform === 'all'))) {
-    return res.status(400).json({ success: false, error: 'Invalid delivery mode' });
   }
 
   if (!rawTitle || !rawBody) {
@@ -54,7 +49,7 @@ async function handler(req, res) {
     };
 
     // Mode: send to specific user by user_id
-    if (user_id || (platform !== 'all' && delivery !== 'os_topic')) {
+    if (user_id || platform !== 'all') {
       // Platform targeting must use device tokens, not a shared FCM topic.
       // Read all pages before sending so a database error cannot cause a partial broadcast.
       const fcmTokens = [];
@@ -131,20 +126,11 @@ async function handler(req, res) {
       });
     }
 
-    // OS topics are enabled only after all existing registered tokens have
-    // been backfilled. Older admin clients keep using the legacy token path.
-    if (delivery === 'os_topic') {
-      const migration = await getTopicMigration(platform);
-      if (!migration.ready) {
-        return res.status(409).json({ success: false, error: 'OS topic is still preparing; retry or use legacy delivery' });
-      }
-    }
-
-    // Mode: send to the existing general topic or a prepared OS topic.
+    // Mode: send to topic (all subscribers)
     const message = {
       notification: { title, body },
-      data: notificationData,
-      topic: delivery === 'os_topic' ? OS_TOPICS[platform] : fcmTopic,
+      data: { type: 'announcement', topic: fcmTopic },
+      topic: fcmTopic,
       android: {
         priority: 'high',
         notification: { channelId: 'announcements', sound: 'default' },
@@ -157,24 +143,21 @@ async function handler(req, res) {
 
     const response = await messaging.send(message);
 
-    const { error: historyError } = await supabaseAdmin
+    await supabaseAdmin
       .from('notifications')
       .insert({
         title,
         body,
         topic: fcmTopic,
         sent_by: user.id,
-        data: notificationData,
+        data: { type: 'announcement', topic: fcmTopic },
       });
-    if (historyError) console.error('[send-notification] History save failed:', historyError.message);
 
     return res.status(200).json({
       success: true,
-      message: `Notification sent to topic: ${message.topic}`,
+      message: `Notification sent to topic: ${fcmTopic}`,
       messageId: response,
       topic: fcmTopic,
-      platform,
-      ...(historyError ? { warning: 'Push sent, but notification history could not be saved' } : {}),
     });
   } catch (error) {
     console.error('[send-notification] Error:', error.message);
