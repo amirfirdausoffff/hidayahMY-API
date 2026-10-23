@@ -1,5 +1,7 @@
 import { supabase, supabaseAdmin } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
+import { messaging } from '../../../src/lib/firebase-admin';
+import { OS_TOPICS } from '../../../src/lib/os-notification-topics';
 
 async function handler(req, res) {
   if (req.method !== 'POST' && req.method !== 'DELETE') {
@@ -26,6 +28,32 @@ async function handler(req, res) {
       return res.status(400).json({ success: false, error: 'fcm_token is required' });
     }
 
+    // Preserve the platform reported by older app versions that omit it on re-registration.
+    const { data: existing, error: lookupError } = await supabaseAdmin
+      .from('fcm_tokens').select('platform').eq('fcm_token', fcm_token).maybeSingle();
+    if (lookupError) return res.status(400).json({ success: false, error: lookupError.message });
+    const reportedPlatform = typeof platform === 'string' ? platform.trim().toLowerCase() : '';
+    const previousPlatform = typeof existing?.platform === 'string' ? existing.platform.trim().toLowerCase() : '';
+    const knownPlatform = OS_TOPICS[reportedPlatform]
+      ? reportedPlatform
+      : OS_TOPICS[previousPlatform] ? previousPlatform : 'unknown';
+
+    // New/changed tokens join the OS topic before they become visible in the
+    // database. This closes the gap between backfill completion and topic sends.
+    if (OS_TOPICS[knownPlatform] && previousPlatform !== knownPlatform) {
+      try {
+        const result = await messaging.subscribeToTopic(fcm_token, OS_TOPICS[knownPlatform]);
+        if (result.failureCount > 0) throw result.errors?.[0]?.error || new Error('Topic subscription failed');
+        if (OS_TOPICS[previousPlatform]) {
+          const removed = await messaging.unsubscribeFromTopic(fcm_token, OS_TOPICS[previousPlatform]);
+          if (removed.failureCount > 0) throw removed.errors?.[0]?.error || new Error('Old topic removal failed');
+        }
+      } catch (error) {
+        console.error('[fcm-token] OS topic registration failed:', error.message);
+        return res.status(503).json({ success: false, error: 'Device registration temporarily unavailable' });
+      }
+    }
+
     // Upsert: same token updates, new token inserts
     const { data, error } = await supabaseAdmin
       .from('fcm_tokens')
@@ -33,7 +61,7 @@ async function handler(req, res) {
         {
           user_id: user.id,
           fcm_token,
-          platform: platform || 'unknown',
+          platform: knownPlatform,
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'fcm_token' }
