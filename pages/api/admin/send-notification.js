@@ -2,7 +2,7 @@ import { supabase, supabaseAdmin } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
 import { messaging } from '../../../src/lib/firebase-admin';
 import { sanitizeString } from '../../../src/lib/validate';
-import { getTopicMigration, OS_TOPICS } from '../../../src/lib/os-notification-topics';
+const OS_TOPICS = { android: 'hidayah_android', ios: 'hidayah_ios' };
 
 async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -29,13 +29,9 @@ async function handler(req, res) {
   const rawBody = req.body.body;
   const { topic, user_id } = req.body;
   const platform = req.body.platform || 'all';
-  const delivery = req.body.delivery || 'legacy';
 
   if (!['all', 'android', 'ios'].includes(platform)) {
     return res.status(400).json({ success: false, error: 'Invalid platform' });
-  }
-  if (!['legacy', 'os_topic'].includes(delivery) || (delivery === 'os_topic' && (user_id || platform === 'all'))) {
-    return res.status(400).json({ success: false, error: 'Invalid delivery mode' });
   }
 
   if (!rawTitle || !rawBody) {
@@ -54,15 +50,13 @@ async function handler(req, res) {
     };
 
     // Mode: send to specific user by user_id
-    if (user_id || (platform !== 'all' && delivery !== 'os_topic')) {
-      // Platform targeting must use device tokens, not a shared FCM topic.
+    if (user_id) {
       // Read all pages before sending so a database error cannot cause a partial broadcast.
       const fcmTokens = [];
       const pageSize = 500;
       for (let offset = 0; ; offset += pageSize) {
         let query = supabaseAdmin.from('fcm_tokens').select('fcm_token').order('fcm_token').range(offset, offset + pageSize - 1);
         if (user_id) query = query.eq('user_id', user_id);
-        if (platform !== 'all') query = query.eq('platform', platform);
         const { data: tokens, error: tokenError } = await query;
         if (tokenError) return res.status(400).json({ success: false, error: tokenError.message });
         fcmTokens.push(...(tokens || []).map((item) => item.fcm_token));
@@ -131,20 +125,11 @@ async function handler(req, res) {
       });
     }
 
-    // OS topics are enabled only after all existing registered tokens have
-    // been backfilled. Older admin clients keep using the legacy token path.
-    if (delivery === 'os_topic') {
-      const migration = await getTopicMigration(platform);
-      if (!migration.ready) {
-        return res.status(409).json({ success: false, error: 'OS topic is still preparing; retry or use legacy delivery' });
-      }
-    }
-
-    // Mode: send to the existing general topic or a prepared OS topic.
+    // Broadcast once to the selected topic. Devices subscribe from the app.
     const message = {
       notification: { title, body },
       data: notificationData,
-      topic: delivery === 'os_topic' ? OS_TOPICS[platform] : fcmTopic,
+      topic: OS_TOPICS[platform] || fcmTopic,
       android: {
         priority: 'high',
         notification: { channelId: 'announcements', sound: 'default' },
