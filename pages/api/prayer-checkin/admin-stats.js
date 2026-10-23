@@ -23,7 +23,7 @@ async function handler(req, res) {
   }
 
   const { period = 'daily', date } = req.query;
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().split('T')[0];
   const targetDate = date || today;
 
   try {
@@ -191,7 +191,7 @@ async function handler(req, res) {
     const { data: todayCheckins, error: todayError } = await supabaseAdmin
       .from('prayer_checkins')
       .select('user_id, prayer')
-      .eq('date', today)
+      .eq('date', targetDate)
       .eq('status', 1);
 
     if (todayError) throw todayError;
