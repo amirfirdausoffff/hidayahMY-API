@@ -1,5 +1,6 @@
 import { supabase, listAllUsers } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
+import { hasAdminMfa } from '../../../src/lib/admin-auth';
 
 const MALAYSIA_OFFSET_MS = 8 * 60 * 60 * 1000;
 
@@ -92,8 +93,8 @@ async function handler(req, res) {
     return res.status(401).json({ success: false, error: 'Invalid or expired token' });
   }
 
-  if (requestingUser.app_metadata?.role !== 'admin') {
-    return res.status(403).json({ success: false, error: 'Admin access required' });
+  if (!hasAdminMfa(requestingUser, token)) {
+    return res.status(403).json({ success: false, error: 'Admin MFA verification required' });
   }
 
   const { users, error } = await listAllUsers();

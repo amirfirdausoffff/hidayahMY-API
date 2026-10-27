@@ -3,6 +3,7 @@ import { cors } from '../../../src/lib/cors';
 import { sanitizeString } from '../../../src/lib/validate';
 import { messaging } from '../../../src/lib/firebase-admin';
 import { notifyNewEvent } from '../../../src/lib/admin-notify';
+import { hasAdminMfa } from '../../../src/lib/admin-auth';
 
 export const config = {
   api: {
@@ -76,7 +77,7 @@ async function handler(req, res) {
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.replace('Bearer ', '');
       const { data: { user } } = await supabase.auth.getUser(token);
-      if (user && user.app_metadata?.role === 'admin') {
+      if (hasAdminMfa(user, token)) {
         isAdmin = true;
       }
     }

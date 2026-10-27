@@ -1,6 +1,7 @@
 import { supabase, supabaseAdmin } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
 import { notifyNewFeedback } from '../../../src/lib/admin-notify';
+import { hasAdminMfa } from '../../../src/lib/admin-auth';
 
 export const config = {
   api: {
@@ -96,8 +97,8 @@ async function handler(req, res) {
       return res.status(401).json({ success: false, error: 'Invalid or expired token' });
     }
 
-    if (user.app_metadata?.role !== 'admin') {
-      return res.status(403).json({ success: false, error: 'Admin access required' });
+    if (!hasAdminMfa(user, token)) {
+      return res.status(403).json({ success: false, error: 'Admin MFA verification required' });
     }
 
     const { data, error } = await supabaseAdmin

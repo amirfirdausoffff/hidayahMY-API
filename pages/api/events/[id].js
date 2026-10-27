@@ -2,6 +2,7 @@ import { supabase, supabaseAdmin } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
 import { sanitizeString } from '../../../src/lib/validate';
 import { messaging } from '../../../src/lib/firebase-admin';
+import { hasAdminMfa } from '../../../src/lib/admin-auth';
 
 async function handler(req, res) {
   const { id } = req.query;
@@ -68,8 +69,12 @@ async function handler(req, res) {
       return res.status(404).json({ success: false, error: 'Event not found' });
     }
 
-    const isAdmin = user.app_metadata?.role === 'admin';
+    const isAdmin = hasAdminMfa(user, token);
     const isOwner = event.user_id === user.id;
+
+    if (user.app_metadata?.role === 'admin' && !isAdmin) {
+      return res.status(403).json({ success: false, error: 'Admin MFA verification required' });
+    }
 
     if (!isAdmin && !isOwner) {
       return res.status(403).json({ success: false, error: 'You can only update your own events' });
@@ -254,8 +259,12 @@ async function handler(req, res) {
       return res.status(404).json({ success: false, error: 'Event not found' });
     }
 
-    const isAdmin = user.app_metadata?.role === 'admin';
+    const isAdmin = hasAdminMfa(user, token);
     const isOwner = event.user_id === user.id;
+
+    if (user.app_metadata?.role === 'admin' && !isAdmin) {
+      return res.status(403).json({ success: false, error: 'Admin MFA verification required' });
+    }
 
     if (!isAdmin && !isOwner) {
       return res.status(403).json({ success: false, error: 'You can only delete your own events' });
