@@ -1,4 +1,4 @@
-import { supabase } from '../../../src/lib/supabase';
+import { supabase, supabaseAdmin } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
 
 async function handler(req, res) {
@@ -18,12 +18,21 @@ async function handler(req, res) {
     return res.status(401).json({ success: false, error: 'Invalid or expired token' });
   }
 
-  const { name, avatar_url } = req.body;
+  const { name, avatar_url, gender } = req.body || {};
   const updates = {};
   if (name !== undefined) updates.name = name;
   if (avatar_url !== undefined) updates.avatar_url = avatar_url;
+  if (gender !== undefined) {
+    if (!['male', 'female'].includes(gender)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Gender must be either male or female',
+      });
+    }
+    updates.gender = gender;
+  }
 
-  const { data, error } = await supabase.auth.admin.updateUserById(user.id, {
+  const { data, error } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
     user_metadata: { ...user.user_metadata, ...updates },
   });
 
@@ -39,6 +48,7 @@ async function handler(req, res) {
       email: data.user.email,
       name: data.user.user_metadata?.name || '',
       avatar_url: data.user.user_metadata?.avatar_url || '',
+      gender: data.user.user_metadata?.gender || null,
     },
   });
 }
