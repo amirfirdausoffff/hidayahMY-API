@@ -18,7 +18,7 @@ async function handler(req, res) {
     return res.status(401).json({ success: false, error: 'Invalid or expired token' });
   }
 
-  if (requestingUser.user_metadata?.role !== 'admin') {
+  if (requestingUser.app_metadata?.role !== 'admin') {
     return res.status(403).json({ success: false, error: 'Admin access required' });
   }
 
@@ -35,7 +35,8 @@ async function handler(req, res) {
     email,
     password,
     email_confirm: true,
-    user_metadata: { name, role: 'admin' },
+    user_metadata: { name },
+    app_metadata: { role: 'admin' },
   });
 
   if (error) {
@@ -49,7 +50,7 @@ async function handler(req, res) {
       id: data.user.id,
       email: data.user.email,
       name: data.user.user_metadata?.name || '',
-      role: data.user.user_metadata?.role || '',
+      role: data.user.app_metadata?.role || '',
       created_at: data.user.created_at,
     },
   });

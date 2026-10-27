@@ -16,7 +16,7 @@ async function handler(req, res) {
   if (authError || !requestingUser) {
     return res.status(401).json({ success: false, error: 'Invalid or expired token' });
   }
-  if (requestingUser.user_metadata?.role !== 'admin') {
+  if (requestingUser.app_metadata?.role !== 'admin') {
     return res.status(403).json({ success: false, error: 'Admin access required' });
   }
 
@@ -27,7 +27,7 @@ async function handler(req, res) {
   }
 
   const customer = data.user;
-  if (customer.user_metadata?.role === 'admin') {
+  if (customer.app_metadata?.role === 'admin') {
     return res.status(403).json({ success: false, error: 'Customer profile only' });
   }
 

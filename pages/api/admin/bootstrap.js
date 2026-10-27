@@ -36,7 +36,7 @@ async function handler(req, res) {
     }
 
     const { error } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
-      user_metadata: { ...user.user_metadata, role: 'admin' },
+      app_metadata: { ...user.app_metadata, role: 'admin' },
     });
 
     if (error) return res.status(400).json({ success: false, error: safeError(error) });
@@ -53,7 +53,8 @@ async function handler(req, res) {
     email,
     password,
     email_confirm: true,
-    user_metadata: { name: 'Admin', role: 'admin' },
+    user_metadata: { name: 'Admin' },
+    app_metadata: { role: 'admin' },
   });
 
   if (error) return res.status(400).json({ success: false, error: safeError(error) });

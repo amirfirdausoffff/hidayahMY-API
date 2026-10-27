@@ -19,7 +19,7 @@ async function handler(req, res) {
     return res.status(401).json({ success: false, error: 'Invalid or expired token' });
   }
 
-  if (user.user_metadata?.role !== 'admin') {
+  if (user.app_metadata?.role !== 'admin') {
     return res.status(403).json({ success: false, error: 'Admin access required' });
   }
 
@@ -62,7 +62,7 @@ async function handler(req, res) {
   }
 
   // Prevent deleting other admins
-  if (targetUser.user_metadata?.role === 'admin') {
+  if (targetUser.app_metadata?.role === 'admin') {
     return res.status(403).json({ success: false, error: 'Cannot delete admin accounts from here' });
   }
 

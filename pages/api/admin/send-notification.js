@@ -21,7 +21,7 @@ async function handler(req, res) {
     return res.status(401).json({ success: false, error: 'Invalid or expired token' });
   }
 
-  if (user.user_metadata?.role !== 'admin') {
+  if (user.app_metadata?.role !== 'admin') {
     return res.status(403).json({ success: false, error: 'Admin access required' });
   }
 

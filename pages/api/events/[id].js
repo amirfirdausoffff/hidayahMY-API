@@ -68,7 +68,7 @@ async function handler(req, res) {
       return res.status(404).json({ success: false, error: 'Event not found' });
     }
 
-    const isAdmin = user.user_metadata?.role === 'admin';
+    const isAdmin = user.app_metadata?.role === 'admin';
     const isOwner = event.user_id === user.id;
 
     if (!isAdmin && !isOwner) {
@@ -254,7 +254,7 @@ async function handler(req, res) {
       return res.status(404).json({ success: false, error: 'Event not found' });
     }
 
-    const isAdmin = user.user_metadata?.role === 'admin';
+    const isAdmin = user.app_metadata?.role === 'admin';
     const isOwner = event.user_id === user.id;
 
     if (!isAdmin && !isOwner) {

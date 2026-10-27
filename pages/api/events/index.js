@@ -76,7 +76,7 @@ async function handler(req, res) {
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.replace('Bearer ', '');
       const { data: { user } } = await supabase.auth.getUser(token);
-      if (user && user.user_metadata?.role === 'admin') {
+      if (user && user.app_metadata?.role === 'admin') {
         isAdmin = true;
       }
     }

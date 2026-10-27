@@ -11,7 +11,7 @@ async function handler(req, res) {
   const token = req.headers.authorization?.replace(/^Bearer /, '');
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
   const { data, error } = await supabase.auth.getUser(token);
-  if (error || data.user?.user_metadata?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  if (error || data.user?.app_metadata?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
 
   const { ADMOB_CLIENT_ID, ADMOB_CLIENT_SECRET, ADMOB_REFRESH_TOKEN, ADMOB_ACCOUNT_ID } = process.env;
   if (!ADMOB_CLIENT_ID || !ADMOB_CLIENT_SECRET || !ADMOB_REFRESH_TOKEN || !ADMOB_ACCOUNT_ID) {

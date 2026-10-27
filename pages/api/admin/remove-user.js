@@ -18,7 +18,7 @@ async function handler(req, res) {
     return res.status(401).json({ success: false, error: 'Invalid or expired token' });
   }
 
-  if (requestingUser.user_metadata?.role !== 'admin') {
+  if (requestingUser.app_metadata?.role !== 'admin') {
     return res.status(403).json({ success: false, error: 'Admin access required' });
   }
 
@@ -39,7 +39,7 @@ async function handler(req, res) {
     return res.status(404).json({ success: false, error: 'User not found' });
   }
 
-  if (targetUser.user_metadata?.role !== 'admin') {
+  if (targetUser.app_metadata?.role !== 'admin') {
     return res.status(400).json({ success: false, error: 'Use delete-customer endpoint for non-admin users' });
   }
 

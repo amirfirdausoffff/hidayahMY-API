@@ -92,7 +92,7 @@ async function handler(req, res) {
     return res.status(401).json({ success: false, error: 'Invalid or expired token' });
   }
 
-  if (requestingUser.user_metadata?.role !== 'admin') {
+  if (requestingUser.app_metadata?.role !== 'admin') {
     return res.status(403).json({ success: false, error: 'Admin access required' });
   }
 
@@ -103,9 +103,9 @@ async function handler(req, res) {
   }
 
   const totalUsers = users.length;
-  const customers = users.filter((u) => u.user_metadata?.role === 'customer');
+  const customers = users.filter((u) => u.app_metadata?.role !== 'admin');
   const totalCustomers = customers.length;
-  const totalAdmins = users.filter((u) => u.user_metadata?.role === 'admin').length;
+  const totalAdmins = users.filter((u) => u.app_metadata?.role === 'admin').length;
   const requestedPeriod = Array.isArray(req.query.period) ? req.query.period[0] : req.query.period;
   const period = ['day', 'week', 'month'].includes(requestedPeriod) ? requestedPeriod : 'week';
 

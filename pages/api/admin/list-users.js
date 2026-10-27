@@ -18,7 +18,7 @@ async function handler(req, res) {
     return res.status(401).json({ success: false, error: 'Invalid or expired token' });
   }
 
-  if (requestingUser.user_metadata?.role !== 'admin') {
+  if (requestingUser.app_metadata?.role !== 'admin') {
     return res.status(403).json({ success: false, error: 'Admin access required' });
   }
 
@@ -33,7 +33,10 @@ async function handler(req, res) {
   let filtered = users;
 
   if (role) {
-    filtered = users.filter((u) => u.user_metadata?.role === role);
+    filtered = users.filter((u) => {
+      const authoritativeRole = u.app_metadata?.role === 'admin' ? 'admin' : 'customer';
+      return authoritativeRole === role;
+    });
   }
 
   // A user can have more than one signed-in device. The FCM token records the
@@ -68,7 +71,7 @@ async function handler(req, res) {
     id: u.id,
     email: u.email,
     name: u.user_metadata?.name || '',
-    role: u.user_metadata?.role || '',
+    role: u.app_metadata?.role === 'admin' ? 'admin' : 'customer',
     provider: u.app_metadata?.provider || '',
     created_at: u.created_at,
     avatar_url: u.user_metadata?.avatar_url || '',
