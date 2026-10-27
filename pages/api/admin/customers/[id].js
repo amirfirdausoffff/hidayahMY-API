@@ -55,6 +55,8 @@ async function handler(req, res) {
       phone: customer.phone || '',
       gender: ['male', 'female'].includes(metadata.gender) ? metadata.gender : null,
       date_of_birth: metadata.date_of_birth || null,
+      nationality_code: metadata.nationality_code || null,
+      nationality: metadata.nationality || null,
       avatar_url:
         metadata.custom_avatar && metadata.custom_avatar !== 'removed'
           ? metadata.custom_avatar

@@ -1,5 +1,6 @@
 import { supabase, supabaseAdmin } from '../../../src/lib/supabase';
 import { cors } from '../../../src/lib/cors';
+import nationalities from '../../../src/data/nationalities.json';
 
 async function handler(req, res) {
   if (req.method !== 'PUT') {
@@ -18,7 +19,7 @@ async function handler(req, res) {
     return res.status(401).json({ success: false, error: 'Invalid or expired token' });
   }
 
-  const { name, avatar_url, gender, date_of_birth } = req.body || {};
+  const { name, avatar_url, gender, date_of_birth, nationality_code } = req.body || {};
   const updates = {};
   if (name !== undefined) updates.name = name;
   if (avatar_url !== undefined) updates.avatar_url = avatar_url;
@@ -43,6 +44,29 @@ async function handler(req, res) {
       updates.date_of_birth = date_of_birth;
     }
   }
+  if (nationality_code !== undefined) {
+    if (nationality_code === null || nationality_code === '') {
+      updates.nationality_code = null;
+      updates.nationality = null;
+    } else {
+      const normalizedCode = typeof nationality_code === 'string'
+        ? nationality_code.trim().toUpperCase()
+        : '';
+      const selectedNationality = nationalities.find(
+        (item) => item.code === normalizedCode && item.code !== 'IL',
+      );
+
+      if (!selectedNationality) {
+        return res.status(400).json({
+          success: false,
+          error: 'Please select a valid nationality',
+        });
+      }
+
+      updates.nationality_code = selectedNationality.code;
+      updates.nationality = selectedNationality.nationality;
+    }
+  }
 
   const { data, error } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
     user_metadata: { ...user.user_metadata, ...updates },
@@ -62,6 +86,8 @@ async function handler(req, res) {
       avatar_url: data.user.user_metadata?.avatar_url || '',
       gender: data.user.user_metadata?.gender || null,
       date_of_birth: data.user.user_metadata?.date_of_birth || null,
+      nationality_code: data.user.user_metadata?.nationality_code || null,
+      nationality: data.user.user_metadata?.nationality || null,
     },
   });
 }
